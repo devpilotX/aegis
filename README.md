@@ -17,8 +17,8 @@ This repository contains **zero implementation code**. It contains everything re
 | `docs/` | The full A-to-Z project description: problem, market, language specification, grammar, type system, semantics, runtime architecture, security model, roadmap |
 | `skills/` | The complete skills catalogue — **1,000+ atomic, individually verifiable skills** organised into 24 domains, with a learning path and self-assessment protocol |
 | `prompts/` | The **Master Prompt** plus 14 phase-level execution prompts, review prompts, and adversarial audit prompts, engineered for a maximum-effort frontier coding model |
-| `.kiro/steering/` | Kiro CLI steering documents — always-loaded project context that constrains every generation |
-| `.kiro/specs/` | Kiro CLI feature specs — 12 features, each with `requirements.md`, `design.md`, `tasks.md` |
+| `.kiro/steering/` | Kiro CLI steering documents — 10 always-loaded project context files that constrain every generation |
+| `.kiro/specs/` | Kiro CLI feature specs — 13 features, each with `requirements.md`, `design.md`, `tasks.md` |
 | `examples/` | Example AEGIS programs covering every language construct |
 | `templates/` | Reusable policy templates mapped to EU AI Act, NIST AI RMF, ISO/IEC 42001 |
 | `research/` | Competitive analysis, prior art, and the precise gap being addressed |

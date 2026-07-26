@@ -129,6 +129,7 @@ specification "1.0"
 package acme.payments
 
 import std.eu_ai_act as eu
+import std.iso42001 as iso
 
 export capability transfer_funds {
   tool         "payments.transfer"
@@ -144,6 +145,10 @@ export principal reviewer {
   mfa   required
 }
 
+schema context  { region : String, channel : String }
+schema resource { amount : Money[EUR] }
+schema model    { risk_tier : Enum[risk_tier] }
+
 policy eu_high_risk_payment_gate {
   combining  deny_overrides
   applies_to context.region in eu.member_states
@@ -151,7 +156,7 @@ policy eu_high_risk_payment_gate {
 
   cites eu.article(6)
   cites eu.article(14)
-  cites iso42001.clause("8.3")
+  cites iso.clause("8.3")
 
   /// Model capability must sit inside the permitted risk band.
   rule tier_bound {
@@ -191,10 +196,11 @@ policy eu_high_risk_payment_gate {
 }
 
 export obligation attach_ai_disclosure {
-  when       decision == permit and context.channel == customer_facing
-  action     disclose(text: eu.transparency_notice())
+  on permit when context.channel == "external" {
+    disclose(text: eu.transparency_notice())
+  }
   on_failure deny
-  cites      eu.article(50)
+  cites eu.article(50)
 }
 
 test "blocks large EU transfer without approval" {
@@ -213,6 +219,8 @@ test "blocks large EU transfer without approval" {
 }
 ```
 
+Three things in this example are load-bearing and were wrong in earlier drafts. The obligation attaches to an effect with `on permit`, not to `when decision == permit`, which is deleted. Every schema is named for a request root, because `schema request` is `AEG-3024`. `iso.clause("8.3")` requires the import that now appears; a citation whose package is not imported is an unresolved reference, and in a compliance tool that is worse than a missing citation.
+
 ### 3.2 Non-obvious design decisions you must not overturn
 
 | Decision | Rationale |
@@ -223,7 +231,7 @@ test "blocks large EU transfer without approval" {
 | Comparison operators are non-associative | `a < b < c` is an error, not a misparse. Policy text is a legal artifact; silent misreading is unacceptable. |
 | No string interpolation | Policy text must be statically readable by an auditor. |
 | ASCII-only identifiers | Prevents homoglyph substitution attacks on legally binding text. |
-| Source is NFC-normalised at parse | Policy identity is a content hash; normalisation is required for hash stability. |
+| Source is never normalised | Normalising inside a string literal would rewrite author-visible disclosure text that is hashed as policy identity. Identifiers are ASCII-only, so normalisation buys nothing where homoglyph attacks matter. Spans are raw file bytes. |
 | RE2 regex only, no backreferences or lookaround | Backtracking regex permits exponential-time matching, violating I11. |
 | `combining` has no default | A silently defaulted combining algorithm is a governance hazard. The author must choose. |
 | `reason` mandatory on denying rules | I8. An unexplainable denial is forbidden. |
@@ -330,7 +338,7 @@ This is the single highest-value constraint in this document. Most hobby languag
 - Every function is total: enumerate every input class and define behaviour for each.
 - No TODO, FIXME, XXX, or commented-out code in committed work. Open an issue instead.
 - No magic numbers. Named constants with a comment citing the spec section that fixes the value.
-- Cyclomatic complexity at most 12 per function; exceed only for table-driven dispatch, with a comment.
+- Cyclomatic complexity at most 15 per function, matching `.kiro/steering/structure.md`; exceed only for table-driven dispatch, with a comment.
 - Files at most 600 lines. Functions at most 60 lines. Exceeding either requires justification in review.
 - Name things after domain concepts, not implementation details: `combineDenyOverrides`, not `combine2`.
 - Every module has a package-level doc comment explaining its role in the pipeline.
@@ -339,22 +347,24 @@ This is the single highest-value constraint in this document. Most hobby languag
 
 Every diagnostic carries a stable code `AEG-NNNN`, a severity, a primary span, expected versus actual state, a suggested fix, and optionally a related span and a spec reference.
 
-Required shape:
+The rendering standard is frozen in `docs/10-error-catalog.md` and that file is the single authority. Required shape:
 
 ```
-error[AEG-4101]: cannot compare Money[EUR] with Money[USD]
+error[AEG-4101]: currency mismatch in comparison
   --> payments.aegis:41:12
    |
 41 |   deny resource.amount > money(10_000, USD)
-   |        ^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^
-   |        Money[EUR]        Money[USD]
+   |        ^^^^^^^^^^^^^^^   ----------------- Money[USD]
+   |        |
+   |        Money[EUR], declared in schema.aegis:12:3
    |
-   = AEGIS forbids implicit currency conversion. Comparing amounts in
-     different currencies is a silent correctness bug in financial policy.
-   = help: convert explicitly with an auditable rate:
-           resource.amount > convert(money(10_000, USD), to: EUR, rate: fx.eur_usd)
-   = spec: section 4.2 rule 2 - currency is part of the Money type
+   = note: currency is part of the Money type, so a comparison across
+           currencies has no defined meaning (type rule 2)
+   = help: convert explicitly, and record the rate for the auditor:
+           deny resource.amount > convert(money(10_000, USD), to: EUR, rate: fx.eur_usd)
 ```
+
+`= note:` and `= help:` are mandatory. `= spec:` is optional. `= why:` does not exist. A secondary span is required only where a second location genuinely exists.
 
 Forbidden: "unexpected token", "parse error", "type mismatch", "invalid input", "something went wrong", or any message that does not tell the reader what to do next. A diagnostic without a suggested fix is an incomplete feature.
 
@@ -372,7 +382,7 @@ Forbidden: "unexpected token", "parse error", "type mismatch", "invalid input", 
 | Mutation | At least 75% mutation score on the checker and evaluator |
 | Benchmark | CI-gated; a regression blocks merge |
 
-Coverage floors: at least 90% line and 85% branch on compiler and runtime; **100% on the evaluator core**.
+Coverage floors are normative in `.kiro/steering/testing.md` and `docs/11-testing-strategy.md`, per package group. That table supersedes any figure quoted here: 100% line and branch on `vm` and `combine`, 95/90 on the frontend and IR packages, 90/85 on `diag`, `report`, and `analysis`, 80/70 on `cmd` and `lsp`, 90/85 repository-wide.
 
 ### 5.4 Performance targets (normative, CI-gated)
 

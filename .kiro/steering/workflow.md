@@ -49,7 +49,7 @@ Then: the invariant ID, the conflict in two sentences, and the nearest design th
 | Phase | Work | Weeks | Impl | Exit criterion |
 |---|---|---|---|---|
 | P0 | Design freeze, scaffolding | 1 | - | Spec frozen, repo scaffolded, Gate G0 passed |
-| P1 | Lexer | 1 | TS | Tokenises every example, fuzz clean |
+| P1 | Lexer | 1 | TS | `conformance/*/lexer/` passes, exact codes, fuzz clean |
 | P2 | Parser | 2 | TS | Full grammar, parse-print-parse idempotent |
 | P3 | Diagnostics | 1 | TS | Every catalogue entry golden-tested |
 | P4 | Type system and binding | 2 | TS | Nine type rules enforced, did-you-mean working |

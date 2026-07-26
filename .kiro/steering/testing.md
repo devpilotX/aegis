@@ -37,7 +37,7 @@ Mutation score on the checker and evaluator: at least 75%.
 3. **Totality of combining.** All seven algorithms return a value for every input multiset.
 4. **Monoid laws.** Six of the seven are associative and commutative with the stated identity. Verified exhaustively for multisets up to size 4, property-tested beyond.
 5. **Fail-closed.** No input sequence turns `Indeterminate` into `Permit`.
-6. **Round-trip.** parse, print, parse is idempotent for every valid program.
+6. **Round-trip.** Reprinting tokens plus trivia reproduces the source byte for byte, and parse, print, parse is idempotent for every valid program.
 7. **Evidence integrity.** Any single-byte mutation, insertion, deletion, or reordering in the chain is detected.
 8. **Justification completeness.** Every non-`NotApplicable` decision names at least one decisive rule with a reason.
 

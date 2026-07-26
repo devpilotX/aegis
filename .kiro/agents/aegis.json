@@ -12,6 +12,7 @@
   ],
   "resources": [
     "file://.kiro/steering/*.md",
+    "file://.kiro/specs/**/*.md",
     "file://prompts/MASTER-PROMPT.md",
     "file://docs/02-language-specification.md",
     "file://docs/03-grammar.md",

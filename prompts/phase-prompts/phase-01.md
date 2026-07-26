@@ -12,23 +12,29 @@ Turn source text into a token stream with exact spans and every lexical limit en
 
 ## Deliverables
 
-- Token kind enumeration and Token struct with half-open byte spans
-- NFC normalisation and UTF-8 validation at the boundary
-- Scanner with maximal munch, keyword table, all literal forms, both comment forms
-- Every AEG-1xxx diagnostic implemented with a golden fixture
-- Round-trip property test and a fuzz target run to zero panics
+- Token kind enumeration and Token type with half-open, 0-based, raw-byte spans
+- UTF-8 validation at the boundary as a fatal check; **no normalisation of any kind**
+- Scanner with maximal munch, the 77-word keyword table, the 29 reserved-forbidden words, all literal forms, and trivia retention for both comment forms
+- Every surviving AEG-1xxx diagnostic implemented with a golden fixture
+- Byte-exact round-trip property test over tokens plus trivia, and a fuzz target run to zero panics
 
 ## Exit criteria - all must hold
 
-1. Every file in examples/ tokenises with byte-exact expected spans
-2. Every AEG-1xxx code has a golden fixture
-3. Fuzzing finds no panic and no hang over one hour
+1. Every file in `conformance/valid/lexer/` tokenises with byte-exact expected spans and trivia
+2. Every file in `conformance/invalid/lexer/` produces exactly the expected diagnostic code and no other
+3. Every surviving AEG-1xxx code has a golden rendered fixture
+4. Fuzzing finds no panic and no hang: 60 seconds pre-commit, 24 hours nightly
+
+The former criterion "every file in examples/ tokenises" is withdrawn. Those files were found in the P0 audit to be invalid AEGIS and are quarantined in `examples/draft/`.
 
 ## Traps specific to this phase
 
-- Reaching for a regex engine. Write the scanner by hand.
+- Reaching for a regex engine. Write the scanner by hand. The RE2 patterns in `docs/03` section 0 are specification prose, not an implementation strategy.
 - Storing line and column on every token. Store byte offsets; derive positions from a line index.
-- Silently replacing invalid UTF-8. That is AEG-1001, not a repair job.
+- Silently replacing invalid UTF-8. That is AEG-1001, it is fatal, and it is not a repair job.
+- Normalising anything. Source is never normalised; spans address the bytes as authored.
+- Validating a currency code. `EUR` and `Set` are the same lexical class; validity is `AEG-4140` in the checker.
+- Discarding comments. They are trivia and the byte-exact round-trip depends on them.
 
 ## Standing constraints
 

@@ -1,6 +1,6 @@
 # Deliberately Invalid Examples
 
-Each snippet below MUST produce the stated diagnostic. These become `conformance/invalid/` cases.
+**DRAFT.** See `README.md` in this directory. These snippets are the intended shape of `conformance/invalid/` cases, not finished cases. Each must produce the stated diagnostic and no other.
 
 ## AEG-4120 - comparison is non-associative
 
@@ -44,16 +44,34 @@ policy p { applies_to true  rule r { deny false reason "x" } }
 rule r { while context.retries < 3 { deny true reason "x" } }
 ```
 
+## AEG-1005 - unexpected character
+
+```aegis
+given { action.capability = delete_data; context.environment = "production" }
+```
+
 ## AEG-4010 - undeclared attribute
 
 ```aegis
 deny context.regoin == "EU"     // did you mean context.region?
 ```
 
-## AEG-1017 - quantifier nesting too deep
+## AEG-3081 - quantifier nesting too deep
 
 ```aegis
-deny exists a in x : exists b in a.y : exists c in b.z : exists d in c.w : d.flag
+deny exists(a in x : exists(b in a.y : exists(c in b.z : exists(d in c.w : d.flag))))
+```
+
+## AEG-3024 - schema name is not a request root
+
+```aegis
+schema request { reviewers : Set[String] }
+```
+
+## AEG-3023 - three-letter uppercase name is reserved for a currency
+
+```aegis
+schema resource { code : EUR }
 ```
 
 ## AEG-2020 - fail-open warning (compiles, warns loudly)
