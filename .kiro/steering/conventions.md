@@ -90,6 +90,7 @@ Task: 1.7
 Invariants: I2, I11
 ```
 
+<!-- retired-ok: AEG-1050 -->
 Note what this example is not. There is no money literal to tokenize: `money(...)` is a call, and currency validity is `AEG-4140` in the checker, not `AEG-1050` in the lexer. Getting that wrong in a commit message is how a retired code returns to life.
 
 Allowed types: `feat` `fix` `spec` `test` `perf` `refactor` `docs` `build` `chore`.

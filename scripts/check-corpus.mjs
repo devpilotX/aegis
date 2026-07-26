@@ -15,7 +15,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -238,16 +238,30 @@ function checkForwardClosure(fail, cat, refs) {
  *
  * A retired *code* must not be referenced anywhere, prose included, because a
  * requirement that cites a burned number is a defect wherever it sits. The only
- * legitimate mentions are the catalogue's own retired table and a line that
- * explicitly says the code was retired or relocated.
+ * way to exempt a mention is an explicit marker naming the specific code.
  *
  * A retired *construct* is a syntax question, so it is only a defect inside
  * AEGIS code: `.aegis` files and fenced aegis blocks in Markdown. Scanning
  * prose for the word "between" produced a heuristic that had to be taught about
  * forty English phrases, and a check that noisy gets silenced rather than fixed.
  */
-const RETIRED_CODES = /AEG-(1013|1015|1016|1017|1018|1050)/;
-const RETIRED_CODE_MENTION_OK = ["retired", "relocated", "formerly", "burned", "Disposition"];
+const RETIRED_CODES = /AEG-(1013|1015|1016|1017|1018|1050)/g;
+
+/**
+ * Suppression marker. Must name the exact code, and the code must appear on the
+ * marker's own line or the line immediately after it:
+ *
+ *     <!-- retired-ok: AEG-1013 -->
+ *
+ * A bare marker exempts nothing, and a marker naming a code that is not there is
+ * itself a failure. Every accepted suppression is printed at the end of every
+ * run, on success as well as on failure.
+ *
+ * This mirrors AEG-2100, where a suppressed advisory still appears in the audit
+ * report. A governance toolchain whose own checker can be silenced invisibly is
+ * not credible, and the checker is held to the standard the language sets.
+ */
+const SUPPRESSION = /<!--\s*retired-ok:\s*(AEG-\d{4})\s*-->/g;
 
 const RETIRED_CONSTRUCTS = [
   { name: "NFC normalisation step", re: /\bNFC\b/ },
@@ -259,29 +273,79 @@ const RETIRED_CONSTRUCTS = [
   { name: "`;` statement separator", re: /;/ },
 ];
 
+/**
+ * Opening fence: three or more backticks or tildes, a lang tag of `aegis` in any
+ * case, and an optional attribute string after it. The closing fence must use
+ * the same character and be at least as long, per CommonMark.
+ */
+const FENCE_OPEN = /^\s*(`{3,}|~{3,})\s*aegis\b[^\n]*$/i;
+
 /** Lines of AEGIS code in a file: the whole file, or just its aegis fences. */
 function aegisCodeLines(rel) {
   const all = read(rel).split(/\r?\n/);
   if (rel.endsWith(".aegis")) return all.map((text, i) => ({ text, line: i + 1 }));
   if (!rel.endsWith(".md")) return [];
+
   const out = [];
-  let inFence = false;
+  let fence = null; // { char, length }
   all.forEach((text, i) => {
-    if (/^\s*```aegis\s*$/.test(text)) { inFence = true; return; }
-    if (inFence && /^\s*```\s*$/.test(text)) { inFence = false; return; }
-    if (inFence) out.push({ text, line: i + 1 });
+    if (fence === null) {
+      const open = text.match(FENCE_OPEN);
+      if (open) fence = { char: open[1][0], length: open[1].length };
+      return;
+    }
+    const close = text.match(/^\s*(`{3,}|~{3,})\s*$/);
+    if (close && close[1][0] === fence.char && close[1].length >= fence.length) {
+      fence = null;
+      return;
+    }
+    out.push({ text, line: i + 1 });
   });
   return out;
 }
 
-function checkRetiredCodes(fail) {
+/**
+ * Collect every suppression marker, validate it against the lines it may cover,
+ * and return both the accepted suppressions and the markers that cover nothing.
+ */
+function collectSuppressions(fail) {
+  const accepted = [];
   for (const rel of corpusFiles()) {
-    if (posix(rel) === CATALOGUE) continue;
-    read(rel).split(/\r?\n/).forEach((text, i) => {
-      const m = text.match(RETIRED_CODES);
-      if (!m) return;
-      if (RETIRED_CODE_MENTION_OK.some((k) => text.includes(k))) return;
-      fail(posix(rel), i + 1, `retired code ${m[0]} referenced; see the retired table in ${CATALOGUE}`);
+    const file = posix(rel);
+    const ls = read(rel).split(/\r?\n/);
+    ls.forEach((text, i) => {
+      for (const m of text.matchAll(SUPPRESSION)) {
+        const code = m[1];
+        const own = ls[i] ?? "";
+        const next = ls[i + 1] ?? "";
+        const onOwn = own.includes(code) && own.replace(m[0], "").includes(code);
+        const onNext = next.includes(code);
+        if (!onOwn && !onNext) {
+          fail(file, i + 1,
+            `suppression marker names ${code}, but ${code} does not appear on this line or the next\n` +
+            "      a marker that covers nothing is either a typo or a stale exemption; delete it");
+          continue;
+        }
+        accepted.push({ file, line: onOwn ? i + 1 : i + 2, code, markerLine: i + 1 });
+      }
+    });
+  }
+  return accepted;
+}
+
+function checkRetiredCodes(fail, suppressions) {
+  const exempt = new Set(suppressions.map((s) => `${s.file}:${s.line}:${s.code}`));
+  for (const rel of corpusFiles()) {
+    const file = posix(rel);
+    read(rel).split(/\r?\n/).forEach((raw, i) => {
+      // A marker names a code by design, so its own text is not a reference.
+      const text = raw.replace(SUPPRESSION, "");
+      for (const m of text.matchAll(RETIRED_CODES)) {
+        if (exempt.has(`${file}:${i + 1}:${m[0]}`)) continue;
+        fail(file, i + 1,
+          `retired code ${m[0]} referenced; see the retired table in ${CATALOGUE}\n` +
+          `      if the mention is deliberate, mark it: <!-- retired-ok: ${m[0]} -->`);
+      }
     });
   }
 }
@@ -299,23 +363,35 @@ function checkRetiredConstructs(fail) {
 }
 
 // ---------------------------------------------------------------------------
-// 5 - every task id in a commit trailer exists in that spec's tasks.md
+// 6 - commit trailers: HEAD must name its task, and numeric ids must exist
 // ---------------------------------------------------------------------------
 
 /**
- * Skipped rather than failed when git history is unavailable: a shallow CI
- * checkout is not a corpus defect. A `Task:` trailer that is prose rather than
- * an id, or a `Spec:` trailer naming documents rather than a spec id, is
- * ignored - those are legitimate for specification-amendment commits.
+ * Two rules, the second of which activates itself.
+ *
+ * 1. The HEAD commit MUST carry a `Task:` trailer. This asserts something on
+ *    every run from now on, in any trailer format.
+ * 2. Once `v0/` exists in the tree, HEAD's trailer MUST be a numeric id that
+ *    exists in the tasks.md of the spec its `Spec:` trailer names. A prose
+ *    trailer such as "pre-1.1 P0 amendment" is accepted only while there is no
+ *    implementation, which is exactly the window in which prose is honest.
+ *
+ * Every numeric trailer in reachable history is checked as well. Skipped rather
+ * than failed when git is unavailable: a checkout without history is not a
+ * corpus defect, and the workflow requests enough depth to avoid it.
  */
 function checkTaskTrailers(fail, note) {
   let log;
+  let headBody;
+  let headSha;
   try {
-    log = execFileSync("git", ["log", "--format=%h%n%B%n--END--"], {
-      cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
-    });
+    const git = (args) =>
+      execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    log = git(["log", "--format=%h%n%B%n--END--"]);
+    headBody = git(["log", "-1", "--format=%B"]);
+    headSha = git(["log", "-1", "--format=%h"]).trim();
   } catch {
-    note("check 5 skipped: git history unavailable");
+    note("check 6 skipped: git history unavailable");
     return;
   }
 
@@ -328,8 +404,40 @@ function checkTaskTrailers(fail, note) {
     ));
   }
   if (specTasks.size === 0) {
-    note("check 5 skipped: no tasks.md files found");
+    fail("scripts/check-corpus.mjs", null,
+      "no .kiro/specs/*/tasks.md found; the task-trailer check cannot assert anything");
     return;
+  }
+
+  const implementationExists = existsSync(join(ROOT, "v0"));
+  const headTask = headBody.match(/^Task:\s*(.+)$/m);
+  const headSpec = headBody.match(/^Spec:\s*(.+)$/m);
+
+  if (!headTask) {
+    fail(`commit ${headSha} (HEAD)`, null,
+      "commit message has no `Task:` trailer; every commit must name the task it completes\n" +
+      "      see the trailer format in .kiro/steering/conventions.md");
+  } else if (implementationExists) {
+    const id = headTask[1].trim();
+    if (!/^\d+(\.\d+)*$/.test(id)) {
+      fail(`commit ${headSha} (HEAD)`, null,
+        `Task: ${id} is prose, but v0/ exists, so the trailer must be a numeric task id\n` +
+        "      prose trailers are accepted only before there is an implementation");
+    } else if (!headSpec) {
+      fail(`commit ${headSha} (HEAD)`, null,
+        `Task: ${id} is numeric but there is no \`Spec:\` trailer naming which tasks.md it belongs to`);
+    } else {
+      const named = headSpec[1].split(",").map((s) => s.trim()).filter((s) => specTasks.has(s));
+      if (named.length === 0) {
+        fail(`commit ${headSha} (HEAD)`, null,
+          `\`Spec: ${headSpec[1].trim()}\` names no known spec id; expected one of ${[...specTasks.keys()].join(", ")}`);
+      } else if (!named.some((s) => specTasks.get(s).has(id))) {
+        fail(`commit ${headSha} (HEAD)`, null,
+          `Task: ${id} does not exist in ${named.map((c) => `.kiro/specs/${c}/tasks.md`).join(" or ")}`);
+      }
+    }
+  } else {
+    note(`check 6: v0/ absent, so HEAD's prose trailer "${headTask[1].trim()}" is accepted`);
   }
 
   let examined = 0;
@@ -353,7 +461,7 @@ function checkTaskTrailers(fail, note) {
         `Task: ${id} does not exist in ${named.map((c) => `.kiro/specs/${c}/tasks.md`).join(" or ")}`);
     }
   }
-  note(`check 5 examined ${examined} commit trailer(s) with a numeric task id`);
+  note(`check 6: ${examined} historical commit(s) carry a numeric task id`);
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +499,8 @@ const CHECKS = [
   ["keyword arithmetic and steering drift", () => { ctx.kw = checkKeywords(fail); }],
   ["grammar terminal classification", () => checkGrammarTerminals(fail, ctx.kw.keywords)],
   ["forward catalogue closure", () => checkForwardClosure(fail, ctx.cat, ctx.refs)],
-  ["retired codes, anywhere in the corpus", () => checkRetiredCodes(fail)],
+  ["suppression markers name a real mention", () => { ctx.sup = collectSuppressions(fail); }],
+  ["retired codes, anywhere in the corpus", () => checkRetiredCodes(fail, ctx.sup)],
   ["retired constructs, in aegis code only", () => checkRetiredConstructs(fail)],
   ["commit task-id trailers", () => checkTaskTrailers(fail, note)],
   ["reverse catalogue closure", () => checkReverseClosure(fail, ctx.cat, ctx.refs)],
@@ -413,6 +522,16 @@ CHECKS.forEach(([name, run], i) => {
 if (notes.length) {
   console.log("");
   for (const n of notes) console.log(`  note: ${n}`);
+}
+
+// Printed on success as well as on failure. A suppression nobody sees is a
+// suppression nobody reviews - the same reason AEG-2100 puts suppressed
+// advisories in the audit report.
+const suppressions = ctx.sup ?? [];
+console.log(`\nactive suppressions: ${suppressions.length}`);
+for (const s of suppressions.slice().sort((a, b) =>
+  a.file.localeCompare(b.file) || a.line - b.line || a.code.localeCompare(b.code))) {
+  console.log(`  ${s.file}:${s.line}  ${s.code}  (marker on line ${s.markerLine})`);
 }
 
 if (failures.length) {
