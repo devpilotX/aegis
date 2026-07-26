@@ -24,10 +24,12 @@ export interface Span {
   readonly end: Pos;
 }
 
-/** Why a span or token could not be constructed. */
+/** Why a span, token, or derived position could not be constructed. */
 export type ConstructionError =
   | "offset-not-an-integer"
   | "offset-negative"
+  | "offset-out-of-range"
+  | "offset-not-a-character-boundary"
   | "end-before-start"
   | "text-length-does-not-match-span";
 

@@ -59,3 +59,16 @@ export {
   tokensEqual,
   utf8Length,
 } from "./token.js";
+
+export type { LineColumn, LineIndex, StrayCarriageReturn } from "./lines.js";
+
+export {
+  buildLineIndex,
+  endOfFilePosition,
+  lineColumnAt,
+  lineCount,
+  lineEnd,
+  lineLengthInBytes,
+  lineStart,
+  renderLineColumn,
+} from "./lines.js";
