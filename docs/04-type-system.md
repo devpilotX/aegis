@@ -61,7 +61,7 @@ deny resource.reviewer is some r and r.role != "finance.approver"
   reason "The assigned reviewer does not hold the approver role."
 
 // Accepted: quantification never sees an absent element
-deny exists r in resource.reviewers : r.role == "finance.approver"
+deny exists(r in resource.reviewers : r.role == "finance.approver")
 ```
 
 After `is some v`, the checker narrows `Optional[T]` to `T` for `v` within that branch only. `is_some(o)` and `is_none(o)` from `std.core` return Bool and do **not** narrow, which is precisely why the `is` form exists.

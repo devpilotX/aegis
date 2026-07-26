@@ -29,16 +29,20 @@ Bidirectional override characters anywhere in the source are `AEG-1002`. Confusa
 | Identifier length | 128 bytes | AEG-1012 | lexer |
 | Decimal significant digits | 38 | AEG-1014 | lexer |
 | Duration magnitude | 1 ms to 100 y inclusive | AEG-1019 | lexer |
-| Diagnostics per compilation unit | 200 | AEG-1006 (fatal) | lexer |
-| Quoted name length | 256 characters | AEG-1013 | parser |
+| Diagnostics per file | 200 | AEG-1006 (fatal for that file) | lexer |
+| Diagnostics per build | 2,000 | AEG-0001 (fatal for the build) | driver |
+| Quoted name length | 256 characters | AEG-3083 | parser |
 | Quoted name character set | `[A-Za-z0-9_./:-]` | AEG-3080 | parser |
 | Quantifier nesting depth | 3 | AEG-3081 | parser |
 | Import graph depth | 32 | AEG-3082 | loader |
 | Collection cardinality | 4,096 | AEG-4160 | checker |
+| Concatenated string value | 64 KiB | AEG-4170 | checker |
 
-There is deliberately **one limit per axis**. A string literal has no length limit of its own: strings are single-line (section 1.7) and a line is capped at 4,096 bytes, so `AEG-1011` already bounds it. The former 64 KiB string limit and its code `AEG-1015` are retired and MUST NOT be reused.
+There is deliberately **one limit per axis, at the layer that owns the axis**. `AEG-1011` bounds a single physical line in bytes, which is a lexical fact. The size of a string *value* is a semantic fact, because adjacent string literals concatenate at parse time (section 1.7), so it is bounded separately at 64 KiB by `AEG-4170`. The old lexical code `AEG-1015` stays retired: it measured the wrong thing at the wrong layer.
 
-Only the lexer rows are lexical. The remaining five are detected by the first component that can actually see the construct, and their codes sit in that component's range. `AEG-1013` keeps its number for the sake of code stability even though it is emitted at parse time; codes are never renumbered once published.
+Only the first six rows are lexical. The rest are detected by the first component that can actually see the construct, and each code sits in that component's range.
+
+**Diagnostic caps are two-level.** 200 per file stops that file; 2,000 across a build stops the build with `AEG-0001`. Without the second, a forty-file bundle could emit eight thousand diagnostics under the per-file cap alone, which is the memory-growth hazard the cap exists to prevent (I11).
 
 **Duration range** is evaluated on the canonical millisecond value, not on the written unit. The permitted closed interval is 1 ms to 3,153,600,000,000 ms, where 100 y = 36,500 d = 3,153,600,000,000 ms. `0s` is `AEG-1019`. `36501d` is `AEG-1019`, even though `100y` is legal.
 
@@ -72,7 +76,9 @@ The keyword set is closed. It contains **77 unique words**, admitted by the rule
 **Values (3):** `true` `false` `some`
 **Binding and assertion (9):** `to` `reason` `given` `expect` `fired` `stable` `is` `on_failure` `decision`
 
-`none` appears once, in Logic. It has exactly one token kind and the parser interprets it by position: quantifier head in `none v in C : P`, absence in `x is none`. Earlier drafts listed it twice; that was a listing error, not two words.
+`none` appears once, in Logic. It has exactly one token kind and the parser interprets it by position: quantifier head in `none(v in C : P)`, absence in `x is none`. Earlier drafts listed it twice; that was a listing error, not two words.
+
+`decision` is a **contextual keyword with exactly one legal position**: the test expectation `expect decision stable`. It is a keyword there because no identifier can stand in that position. It is legal nowhere else, and in particular it is not a value, not a request root, and not usable in an expression. Anywhere else, `AEG-3070` reports it as a keyword in an illegal position.
 
 **Reserved and forbidden (29).** Using one is `AEG-1030`, whose message MUST name the invariant or the scope rule that forbids it. These words lex as a single reserved kind so that the error is precise and so that the design cannot be pressured into them later by accident.
 
@@ -104,7 +110,7 @@ Everything else is a predeclared identifier or an enum member. This rule exists 
 
 **Demotions recorded for the avoidance of doubt.** `action` and the other eight request roots, `low`/`medium`/`high`/`critical`, `workspace`/`tenant`/`global`, `required`/`optional`, `scope`, `money`, `duration`, and `percent` were keywords or keyword-shaped in earlier drafts and are now identifiers. `to`, `reason`, `given`, `expect`, `fired`, `stable`, `is`, `on_failure`, and `decision` were terminals used by the grammar without ever being listed and are now keywords.
 
-`decision` is admitted by the rule rather than by enumeration: in `expect decision stable` no identifier can stand in its place. Its second use, `when decision == permit` in an obligation, is **not settled** by this amendment - `decision` is not one of the nine request roots, and what an obligation's `when` clause may name is an open question recorded against `docs/03` as OPEN-3.
+`decision` is admitted by the rule rather than by enumeration, but **only in one position**: `expect decision stable`, where no identifier can stand. It is a contextual keyword, not a general one. The expression form `when decision == permit` that appeared in earlier drafts is **deleted** from the language: it put `decision` in a position where an identifier could stand, which the admission rule forbids, and it named something no scope bound. Obligations now attach to an effect directly (section 3.8).
 
 ### 1.6 Identifiers
 
@@ -117,6 +123,8 @@ Three lexical classes, ASCII only.
 | currency | `[A-Z]{3}` | currency codes, e.g. `EUR` |
 
 A currency code is **lexed as a `TypeIdent`** and disambiguated by the parser from its position as the second argument of `money(...)` or the `to:` argument of `convert(...)`. The lexer performs no currency validation whatsoever; validity against ISO 4217 is a check-time concern, `AEG-4140`. This is the only sound arrangement, because `EUR` and `Set` are indistinguishable to a scanner with one token of lookahead.
+
+**Every `TypeIdent` matching `^[A-Z]{3}$` is reserved as a currency code**, whether or not it is a live ISO 4217 code. Declaring a type named `EUR`, `XYZ`, or `ABC` is `AEG-3023`. The reservation is deliberately table-independent: if legality depended on membership of the currency table, the same source would compile or fail according to which table revision was in force, and a compile outcome that varies with a data file is an I2 violation waiting to happen.
 
 Non-ASCII in any identifier class is `AEG-1004`. Non-ASCII is rejected outright to prevent homoglyph substitution in text that carries legal weight, which is also why `AEG-1003` does not apply to identifiers: there is nothing left for it to catch.
 
@@ -145,6 +153,20 @@ The 128-byte limit (`AEG-1012`, inclusive) applies to `ident` and `TypeIdent` al
 **Duration** is one token and the only place where a number and a following letter sequence fuse. Maximal munch applies: digits immediately followed, with no intervening whitespace or comment, by one of `ms` `s` `m` `h` `d` `w` `y`. `y` is exactly 365 d and `w` is exactly 7 d, because calendar arithmetic is timezone-dependent and therefore forbidden by I2. `5 m` is two tokens and fails in the parser, not the lexer. A non-integer magnitude such as `1.5h` is `AEG-1056`. An unknown unit such as `30days` is `AEG-1055`. A magnitude outside the range in section 1.2 is `AEG-1019`.
 
 **String** literals may not span a line. Unterminated at end of line is `AEG-1041`; unterminated at end of file is `AEG-1042`; an unknown escape is `AEG-1040`. There is no interpolation, because policy text must be statically readable by an auditor.
+
+**Adjacent string literals concatenate at parse time.** Two or more string literals separated only by whitespace, line terminators, or comments join into one value, in source order, with nothing inserted between them:
+
+```aegis
+reason "This action was refused because the transfer is irreversible "
+       "and no fresh human approval was on record at the moment of the "
+       "request. See the linked evidence record for the exact bindings."
+```
+
+There is no operator, no runtime cost, and no ambiguity: the join happens in the parser and the result is a single literal in the IR. The lexer emits one token per literal and performs no joining.
+
+This exists for a specific regulatory reason. An Article 50 transparency notice, a `description`, or a substantial `reason` cannot fit inside a 4,096-byte line, and the alternative - a multi-line string - would make the line-length limit unenforceable and the caret rendering ambiguous. The joined value is bounded at 64 KiB by `AEG-4170`, checked after concatenation, which is where the size of a value can first be known.
+
+Concatenation applies to string literals in value positions: `reason`, `description`, expression operands, and `expect reason contains`. It does **not** apply to a quoted name (`tool`, `role`), to the `specification` version, or to a `test` or `suite` name, all of which must be single atomic literals because they are identities rather than prose.
 
 **Delimiters and operators - the complete set.**
 
@@ -192,7 +214,7 @@ limit codes           AEG-1011 1012 1014 1019
 
 **Every other lexical error skips the offending lexeme and continues**, so that one pass reports every lexical defect in the file rather than one per compile.
 
-**Diagnostics are capped at 200 per compilation unit.** On reaching the cap the lexer emits `AEG-1006` and stops. An unbounded diagnostic list on hostile input is a memory-growth hazard, and I11 does not stop being true because the input is invalid.
+**Diagnostics are capped at 200 per file.** On reaching the cap the lexer emits `AEG-1006` and stops lexing that file. A second cap of 2,000 diagnostics across a whole build is enforced by the driver and stops the build with `AEG-0001`. An unbounded diagnostic list on hostile input is a memory-growth hazard, and I11 does not stop being true because the input is invalid.
 
 **Exactly one EOF token is always emitted**, on every path. For an empty file its span is `[0, 0)`. After a fatal error its span is zero-width at the offset where lexing stopped. The parser may therefore assume EOF exists without a special case.
 
@@ -202,7 +224,9 @@ limit codes           AEG-1011 1012 1014 1019
 
 A compilation unit MUST begin with `specification "<version>"`, then exactly one `package` declaration, then zero or more `import` declarations, then declarations in any order. Declaration order MUST NOT affect meaning; binding is two-pass. Missing `specification` is `AEG-3001`. Missing `package` is `AEG-3002`. Package name not matching directory path is `AEG-3003`. Circular import is `AEG-3010`, reported with the full cycle. Import graph depth beyond 32 is `AEG-3082`.
 
-A declaration identifier MUST be unique within a compilation unit across every declaration kind - `capability`, `principal`, `resource_class`, `enum`, `schema`, `const`, `policy`, `obligation`, `advice`, `suite`. A collision is `AEG-3022`, reported with both spans. Two narrower duplicates keep their own codes because their messages can say more: duplicate `tool` name is `AEG-3021` and duplicate rule identifier within a policy is `AEG-3040`.
+A declaration identifier MUST be unique within a compilation unit across every declaration kind - `capability`, `principal`, `resource_class`, `enum`, `schema`, `const`, `policy`, `obligation`, `advice`, `suite`. A collision is `AEG-3022`, reported with both spans. **The check is local to the compilation unit**: two packages may each declare `transfer_funds`, because a package namespaces its declarations, and a cross-package coincidence of names is not an error. A collision between an import alias and a local declaration identifier **is** an error, `AEG-3025`, because the two would be indistinguishable at a use site.
+
+Two narrower duplicates keep their own codes because their messages can say more: duplicate `tool` name is `AEG-3021` and duplicate rule identifier within a policy is `AEG-3040`.
 
 ---
 
@@ -230,6 +254,21 @@ Ordered variants. Ordering is significant and defines the comparison relation. `
 
 Declares the request surface. Every attribute path used anywhere MUST be declared in some schema. Undeclared attribute access is `AEG-4010`, with a did-you-mean suggestion. There is no dynamic attribute access.
 
+**A schema's name is the request root it constrains, and it MUST be one of the nine.** Schemas do not float:
+
+```aegis
+schema resource {
+  reviewers : Set[Record{ id: String, role: String }]
+  amount    : Money[EUR]
+}
+
+schema context { region : String, channel : String }
+```
+
+`schema request { ... }` is illegal, because `request` is not a root: `AEG-3024`, with the nine legal names listed in the help line. Before this was settled, a schema named `request` declaring `reviewers` and a rule referring to `resource.reviewers` could both look correct while agreeing about nothing.
+
+At most one schema per root; a second is `AEG-3022`. Fields of a root may be declared across imported packages, which is how a shared schema library works.
+
 The nine request roots are predeclared identifiers bound in the prelude scope, not keywords (section 1.5.1). Shadowing one with a declaration identifier, a `const`, or a quantifier variable is `AEG-4011`, because a policy in which `action` means something other than the action under evaluation is unreadable by the auditor who has to accept it.
 
 ### 3.6 policy
@@ -252,7 +291,26 @@ Rule identifiers MUST be unique within a policy (`AEG-3040`). A `reason` string 
 
 ### 3.8 obligation and advice
 
-An `obligation` MUST declare `when`, `action`, and `on_failure` (`AEG-3050`). Obligations are binding: the PEP MUST discharge them, and failure to discharge MUST fail closed. `advice` is non-binding and MUST NOT affect the decision.
+An `obligation` attaches to a **decision effect**, not to a condition on a decision value:
+
+```aegis
+export obligation attach_ai_disclosure {
+  on permit when context.channel == "external" {
+    disclose(text: eu.transparency_notice())
+  }
+  on deny {
+    audit.emit(severity: medium, evidence: full_trace)
+  }
+  on_failure deny
+  cites eu.article(50)
+}
+```
+
+An obligation MUST declare at least one `on <effect>` block and exactly one `on_failure` (`AEG-3050`). The trigger effect is `permit` or `deny`. A block MAY carry a `when` guard, which is an ordinary Bool expression over the request and MUST NOT mention the decision; the trigger already carries that information.
+
+The earlier form `when decision == permit and <condition>` is deleted. It placed `decision` in an expression position, which the keyword admission rule forbids, and it referenced a name that no scope bound. The `on <effect> [when <guard>]` form expresses exactly the same thing with the trigger and the guard separated, which is also how the audit report reads it: "on permit, where the channel is external, disclose ...".
+
+Obligations are binding: the PEP MUST discharge them, and failure to discharge MUST fail closed. `advice` is non-binding, keeps its `when <condition>` form because it never mentions a decision, and MUST NOT affect the outcome.
 
 ### 3.9 test
 
@@ -300,7 +358,21 @@ Nine normative rules.
 
 ### 5.2 Quantifiers
 
-`forall v in C : P(v)`, `exists v in C : P(v)`, `count v in C : P(v)`, plus `any`, `all`, `none`. The collection MUST have statically known maximum cardinality; exceeding 4,096 is `AEG-4160`, detected by the checker, which is the first component that knows a collection's declared size. Nesting depth MUST NOT exceed 3; exceeding it is `AEG-3081`, detected by the parser, which is the first component that can count nesting. This is the only form of iteration in the language - I1.
+**Quantifier bodies are delimited. The parentheses are mandatory.**
+
+```
+quant "(" ident "in" collection ":" body ")"
+```
+
+```aegis
+count(r in resource.reviewers : r.role == "legal.approver") >= 2
+forall(r in resource.reviewers : r.mfa is some m)
+exists(a in resource.attachments : a.data_class == "special_category")
+```
+
+Six quantifier heads: `forall`, `exists`, `count`, `any`, `all`, `none`. The delimiter is not decoration. Without it the body is an `expr` that extends as far to the right as it can, so `count r in c : r.role == "x" >= 2` parses its body as `r.role == "x" >= 2` - a non-associative comparison chain, `AEG-4120` - and the parse the author intended is not derivable at all. Parentheses make the body a closed subexpression, so the intended parse becomes the only parse.
+
+The collection MUST have statically known maximum cardinality; exceeding 4,096 is `AEG-4160`, detected by the checker, which is the first component that knows a collection's declared size. Nesting depth MUST NOT exceed 3; exceeding it is `AEG-3081`, detected by the parser, which is the first component that can count nesting. This is the only form of iteration in the language - I1.
 
 ### 5.3 Temporal operators
 

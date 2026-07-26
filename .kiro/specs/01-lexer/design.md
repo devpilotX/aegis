@@ -34,7 +34,7 @@ Hand-written scanner over a byte array (`Uint8Array`) with one token of lookahea
 
 **Keyword resolution** is a frozen table: 77 keyword words, 29 reserved-forbidden words. Lookup is by exact byte equality on the lexeme. The table is a lookup structure only; it is never iterated, so no ordering question arises (I2).
 
-**Diagnostics are accumulated in a sink**, not returned, which is what allows single-pass multi-error reporting. The sink enforces two rules from `docs/02` section 1.9: exactly one diagnostic per lexeme, chosen by the stated precedence order, and a hard cap of 200 diagnostics per unit after which `AEG-1006` is emitted and lexing stops. Three errors are fatal - `AEG-1001`, `AEG-1010`, `AEG-1006` - and every other error skips the offending lexeme and continues.
+**Diagnostics are accumulated in a sink**, not returned, which is what allows single-pass multi-error reporting. The sink enforces two rules from `docs/02` section 1.9: exactly one diagnostic per lexeme, chosen by the stated precedence order, and a hard cap of 200 diagnostics per file after which `AEG-1006` is emitted and lexing of that file stops. The build-wide cap of 2,000 (`AEG-0001`) belongs to the driver, not here. Three errors are fatal - `AEG-1001`, `AEG-1010`, `AEG-1006` - and every other error skips the offending lexeme and continues.
 
 **One EOF token is emitted on every path**, including the empty file and every fatal path, so the parser needs no special case.
 
@@ -43,11 +43,14 @@ Hand-written scanner over a byte array (`Uint8Array`) with one token of lookahea
 | Concern | Owner | Code |
 |---|---|---|
 | Currency validity | checker | AEG-4140 |
+| Three-letter TypeIdent reservation | parser | AEG-3023 |
 | Duration range on a `duration(n, unit)` call | checker | AEG-4141 |
-| Quoted name length and character set | parser | AEG-1013, AEG-3080 |
+| Quoted name length and character set | parser | AEG-3083, AEG-3080 |
 | Quantifier nesting depth | parser | AEG-3081 |
 | Import graph depth | loader | AEG-3082 |
 | Collection cardinality | checker | AEG-4160 |
+| Adjacent string concatenation, and the 64 KiB value limit | parser, then checker | AEG-4170 |
+| Build-wide diagnostic cap | driver | AEG-0001 |
 | Doc comment attachment | parser | AEG-2091 |
 | Percent and money value construction | parser | - |
 

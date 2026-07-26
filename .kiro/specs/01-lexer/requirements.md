@@ -41,7 +41,7 @@ Two things this component deliberately does **not** do, both settled by the P0 a
 3.4. WHEN an identifier of either class exceeds 128 bytes THEN the lexer SHALL emit AEG-1012.
 3.5. WHEN a numeric literal exceeds 38 significant digits, counted as defined in `docs/02` section 1.2, THEN the lexer SHALL emit AEG-1014.
 3.6. WHEN a duration literal is outside 1 ms to 100 y inclusive, evaluated in canonical milliseconds, THEN the lexer SHALL emit AEG-1019.
-3.7. WHEN 200 diagnostics have been emitted for one compilation unit THEN the lexer SHALL emit AEG-1006 and SHALL stop lexing.
+3.7. WHEN 200 diagnostics have been emitted for one file THEN the lexer SHALL emit AEG-1006 and SHALL stop lexing that file.
 
 ### 4. Security
 
@@ -67,6 +67,7 @@ Two things this component deliberately does **not** do, both settled by the P0 a
 5.8. WHEN an escape other than `\"` `\\` `\n` `\t` appears in a string THEN the lexer SHALL emit AEG-1040.
 5.9. WHEN a `%` follows a numeric literal THEN the lexer SHALL emit two tokens and SHALL NOT build a percent value.
 5.10. WHEN a currency code appears THEN the lexer SHALL emit a TypeIdent token and SHALL NOT validate the code.
+5.11. WHEN two string literals are adjacent, separated only by trivia, THEN the lexer SHALL emit two separate string tokens and SHALL NOT concatenate them; concatenation is performed by the parser.
 
 ### 6. Trivia and comments
 
@@ -108,4 +109,4 @@ Plus: every surviving `AEG-1xxx` code has a golden rendered fixture, and the fuz
 
 Anything not listed above. If a capability seems necessary but is not written here, stop and amend this document first (I10). Do not implement ahead of the specification.
 
-Explicitly out of scope for this component, with the owner of each: currency validation (`AEG-4140`, checker), quoted-name length and character set (`AEG-1013` and `AEG-3080`, parser), quantifier nesting depth (`AEG-3081`, parser), import graph depth (`AEG-3082`, loader), collection cardinality (`AEG-4160`, checker), doc comment attachment and `AEG-2091` (parser), any form of normalisation (nobody - it does not happen).
+Explicitly out of scope for this component, with the owner of each: currency validation (`AEG-4140`, checker), the three-letter TypeIdent reservation (`AEG-3023`, parser), quoted-name length and character set (`AEG-3083` and `AEG-3080`, parser), quantifier nesting depth (`AEG-3081`, parser), import graph depth (`AEG-3082`, loader), collection cardinality (`AEG-4160`, checker), string concatenation and its 64 KiB value limit (`AEG-4170`, parser then checker), the build-wide diagnostic cap (`AEG-0001`, driver), doc comment attachment and `AEG-2091` (parser), any form of normalisation (nobody - it does not happen).

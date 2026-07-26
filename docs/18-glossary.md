@@ -24,7 +24,7 @@
 | **Justification** | The minimal tree of decisive rules, spans, citations, and referenced bindings (I8). |
 | **Keyword admission rule** | A word is a keyword only if it appears where an identifier could not. Everything else is a predeclared identifier or an enum member (docs/02 section 1.5.1). |
 | **Layer 4** | The governance layer: machine-checkable constraints plus audit evidence. AEGIS's domain. |
-| **Obligation** | A binding action the enforcement point must discharge, with a declared on_failure effect. |
+| **Obligation** | A binding action the enforcement point must discharge, attached to a decision effect with `on permit` or `on deny` and carrying a declared on_failure effect. |
 | **Optional discharge** | Proving a value is present before using it, written `x is none` or `x is some v`. The `some` form binds and narrows. |
 | **PAP** | Policy Administration Point. Authors, signs, distributes bundles. |
 | **PDP** | Policy Decision Point. The pure, total evaluator. |
