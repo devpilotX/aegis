@@ -14,9 +14,9 @@ The lexer cannot emit a single `AEG-1xxx` without somewhere to put it, so the fi
 
 In Phase 1 a diagnostic is a **structured value that is collected and counted, never a rendered string**. If a Phase 1 turn finds itself formatting a caret, it has crossed the boundary and must stop. Turn headers for the three P1 tasks read `SPEC: 13-diagnostics | TASK: 13.1 | PHASE: P1`.
 
-- [ ] **13.1** Define the Diagnostic value type with mandatory note and help, severity, code, primary span **[delivered in P1 as a dependency of 01-lexer task 1.4]**
-- [ ] **13.2** Implement the sink interface with content-only ordering and duplicate suppression **[delivered in P1 as a dependency of 01-lexer task 1.4]**
-- [ ] **13.3** Implement the code registry and the per-file cap (AEG-1006); the build cap (AEG-0001) is driver-side and stays in P9 **[delivered in P1 as a dependency of 01-lexer task 1.4]**
+- [x] **13.1** Define the Diagnostic value type with mandatory note and help, severity, code, primary span **[delivered in P1 as a dependency of 01-lexer task 1.4]**
+- [x] **13.2** Implement the sink interface with content-only ordering and duplicate suppression **[delivered in P1 as a dependency of 01-lexer task 1.4]**
+- [x] **13.3** Implement the code registry and the per-file cap (AEG-1006); the build cap (AEG-0001) is driver-side and stays in P9 **[delivered in P1 as a dependency of 01-lexer task 1.4]**
 - [ ] **13.4** Implement the line index and 1-based scalar-value position derivation shared with the lexer
 - [ ] **13.5** Implement the source excerpt renderer with caret alignment and tab handling
 - [ ] **13.6** Implement secondary spans with labels, and the multi-span layout in the frozen standard
