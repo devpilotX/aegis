@@ -1,0 +1,24 @@
+{
+  "name": "aegis-v0",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AEGIS v0 prototype. Phases 1-5, TypeScript, throwaway by design.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@vitest/coverage-v8": "2.1.8",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}

@@ -1,0 +1,9 @@
+# pnpm 11 requires dependency install scripts to be approved explicitly rather
+# than run implicitly, which is the right default for a governance project.
+#
+# esbuild ships a platform-specific binary and needs its install script to place
+# it. It is a transitive dependency of vitest - test tooling, permitted by
+# .kiro/steering/tech.md - and nothing in the evaluation or evidence path
+# depends on it. No other dependency is allowed to run a build script.
+allowBuilds:
+  esbuild: true
