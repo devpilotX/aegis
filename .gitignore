@@ -1,0 +1,7 @@
+dist/
+node_modules/
+coverage/
+*.aegisc
+*.aegisb
+.DS_Store
+v0/.vitest/

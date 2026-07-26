@@ -1,0 +1,75 @@
+// The canonical example. Exercises capabilities, principals, temporal freshness,
+// clause citation, obligations, and the violation handler.
+specification "1.0"
+package examples.payments
+import std.eu_ai_act as eu
+
+export capability transfer_funds {
+  tool         "payments.transfer"
+  criticality  high
+  reversible   false
+  data_classes { pii, financial }
+}
+
+export principal reviewer {
+  role  "finance.approver"
+  scope tenant
+  mfa   required
+}
+
+enum risk_tier { minimal, limited, high, unacceptable }
+
+policy eu_high_risk_payment_gate {
+  combining  deny_overrides
+  applies_to context.region in eu.member_states
+             and action.capability == transfer_funds
+  cites eu.article(6)
+  cites eu.article(14)
+
+  /// The model must sit within the permitted risk band.
+  rule tier_bound {
+    require model.risk_tier <= limited
+    otherwise deny
+      reason "Model risk tier exceeds the permitted band for irreversible payments."
+  }
+
+  /// Approval must exist and must be fresh. Staleness is not approval.
+  rule human_gate {
+    deny action.capability == transfer_funds
+    unless human.approved_by(reviewer) within 5m
+      reason "Irreversible high-value action requires fresh human approval."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("risk-oncall")
+  }
+}
+
+test "blocks large EU transfer without approval" {
+  given {
+    context.region  = "EU"
+    resource.amount = money(25_000, EUR)
+    action.capability = transfer_funds
+    model.risk_tier = limited
+    human.approved  = false
+  }
+  expect deny
+  expect rule human_gate fired
+  expect decision stable
+}
+
+test "permits with fresh approval" {
+  given {
+    context.region  = "EU"
+    resource.amount = money(25_000, EUR)
+    action.capability = transfer_funds
+    model.risk_tier = limited
+    human.approved  = true
+    human.approved_at = 2m ago
+  }
+  expect permit
+}

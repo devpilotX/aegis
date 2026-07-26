@@ -1,0 +1,40 @@
+// TEMPLATE: EU AI Act Article 12 - Record-Keeping
+// Purpose: Automatic logging must be retained for the period appropriate to the intended purpose.
+// Adapt the constants and the applies_to target. Do not remove the citation.
+specification "1.0"
+package templates.eu_ai_act_art12_record_keeping
+import std.eu_ai_act as eu
+import std.nist_ai_rmf as nist
+import std.iso42001 as iso42001
+import std.gdpr as gdpr
+import std.soc2 as soc2
+
+const approval_freshness = 5m
+const max_eval_age       = 30d
+const min_score          = 0.90
+
+/// Automatic logging must be retained for the period appropriate to the intended purpose.
+policy record_keeping {
+  combining  deny_overrides
+  applies_to true                    // NARROW THIS before deployment
+  cites eu.article(12)
+
+  rule record_keeping {
+    require context.evidence_retention >= 6mo
+    otherwise deny
+      reason "Automatic logging must be retained for the period appropriate to the intended purpose."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("governance-oncall")
+  }
+}
+
+test "template compiles and denies by default" {
+  given { }
+  expect deny
+}

@@ -1,0 +1,27 @@
+// The smallest useful AEGIS program. Phase 1 target: three keywords, end to end.
+specification "1.0"
+package examples.hello
+
+/// Any attempt to delete production data is refused outright.
+policy no_production_deletes {
+  combining  deny_overrides
+  applies_to action.capability == "data.delete"
+
+  rule block_prod {
+    deny context.environment == "production"
+      reason "Deletion of production data is never permitted for an autonomous agent."
+  }
+
+  default permit
+}
+
+test "blocks a production delete" {
+  given { action.capability = "data.delete"; context.environment = "production" }
+  expect deny
+  expect rule block_prod fired
+}
+
+test "allows a staging delete" {
+  given { action.capability = "data.delete"; context.environment = "staging" }
+  expect permit
+}

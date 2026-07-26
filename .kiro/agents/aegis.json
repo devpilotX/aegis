@@ -1,0 +1,39 @@
+{
+  "name": "aegis",
+  "description": "AEGIS language build agent. Auto-approves file and shell tools so the 200+ task backlog runs without permission prompts. Steering files are always loaded.",
+  "prompt": "You are building AEGIS, an independent total declarative language for AI agent governance. Read prompts/MASTER-PROMPT.md in full before your first action and follow it exactly. The eleven invariants are absolute. Work one task at a time from the active .kiro/specs/*/tasks.md file, top to bottom. Three keywords - allow, deny, require - must work end to end before a fourth is added.",
+  "allowedTools": [
+    "read",
+    "write",
+    "execute_bash",
+    "fs_read",
+    "fs_write",
+    "knowledge"
+  ],
+  "resources": [
+    "file://.kiro/steering/*.md",
+    "file://prompts/MASTER-PROMPT.md",
+    "file://docs/02-language-specification.md",
+    "file://docs/03-grammar.md",
+    "file://docs/10-error-catalog.md"
+  ],
+  "toolsSettings": {
+    "write": {
+      "deniedPaths": [
+        ".env",
+        ".env.*",
+        "**/*.pem",
+        "**/*.key",
+        ".git/**"
+      ]
+    },
+    "read": {
+      "deniedPaths": [
+        ".env",
+        ".env.*",
+        "**/*.pem",
+        "**/*.key"
+      ]
+    }
+  }
+}

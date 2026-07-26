@@ -1,0 +1,39 @@
+// TEMPLATE: ISO/IEC 42001 Annex A - Access Control
+// Purpose: An agent may invoke only capabilities explicitly granted to its role.
+// Adapt the constants and the applies_to target. Do not remove the citation.
+specification "1.0"
+package templates.iso42001_annexa_access_control
+import std.eu_ai_act as eu
+import std.nist_ai_rmf as nist
+import std.iso42001 as iso42001
+import std.gdpr as gdpr
+import std.soc2 as soc2
+
+const approval_freshness = 5m
+const max_eval_age       = 30d
+const min_score          = 0.90
+
+/// An agent may invoke only capabilities explicitly granted to its role.
+policy least_privilege {
+  combining  deny_overrides
+  applies_to true                    // NARROW THIS before deployment
+  cites iso42001.annex_a("A.6.2")
+
+  rule least_privilege {
+    deny not (action.capability in subject.granted_capabilities)
+      reason "An agent may invoke only capabilities explicitly granted to its role."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("governance-oncall")
+  }
+}
+
+test "template compiles and denies by default" {
+  given { }
+  expect deny
+}

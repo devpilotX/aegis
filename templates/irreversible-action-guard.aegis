@@ -1,0 +1,40 @@
+// TEMPLATE: Cross-Framework - Irreversible Action Guard
+// Purpose: Irreversible high-criticality actions always require fresh senior approval.
+// Adapt the constants and the applies_to target. Do not remove the citation.
+specification "1.0"
+package templates.irreversible_action_guard
+import std.eu_ai_act as eu
+import std.nist_ai_rmf as nist
+import std.iso42001 as iso42001
+import std.gdpr as gdpr
+import std.soc2 as soc2
+
+const approval_freshness = 5m
+const max_eval_age       = 30d
+const min_score          = 0.90
+
+/// Irreversible high-criticality actions always require fresh senior approval.
+policy irreversible_guard {
+  combining  deny_overrides
+  applies_to true                    // NARROW THIS before deployment
+  cites eu.article(14)
+
+  rule irreversible_guard {
+    deny action.capability.reversible == false and action.capability.criticality >= high
+    unless human.approved_by(senior_overseer) within 10m
+      reason "Irreversible high-criticality actions always require fresh senior approval."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("governance-oncall")
+  }
+}
+
+test "template compiles and denies by default" {
+  given { }
+  expect deny
+}
