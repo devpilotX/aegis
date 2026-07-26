@@ -1,0 +1,11 @@
+AEGIS - Agent Enforcement & Governance Instruction Specification
+Copyright 2026 Dipanshu Kumar
+
+This product is licensed under the Apache License, Version 2.0. The full
+licence text is in LICENSE and must be included verbatim in any distribution.
+
+The AEGIS name and logo are trademarks and are not licensed under the Apache
+License, so that the term "AEGIS-conformant" retains meaning. Section 6 of
+the licence reserves trademark rights; this notice states the specific
+reservation. You may describe an implementation as AEGIS-conformant only if
+it passes the published conformance suite in full.
