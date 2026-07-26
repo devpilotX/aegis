@@ -8,7 +8,7 @@ inclusion: always
 
 | Version | Language | Purpose | Lifespan |
 |---|---|---|---|
-| v0 | TypeScript (Node 20+) | Design exploration. Fast to iterate while the language shape is still moving. | Phases 1-5, then discarded |
+| v0 | TypeScript (Node 22.13+) | Design exploration. Fast to iterate while the language shape is still moving. | Phases 1-5, then discarded |
 | v1 | **Go 1.22+** | The real implementation. Single static binary. | Phase 6 onward, forever |
 
 The v0 implementation is a throwaway prototype and must be treated as one. Do not add features to it after Phase 5. Do not port its architecture verbatim - port its behaviour, verified by differential testing against the entire corpus.
@@ -106,7 +106,7 @@ docker build -t aegis-scratch . && docker run --rm aegis-scratch version
 | Tool | Purpose |
 |---|---|
 | Go 1.22+ | v1 implementation |
-| Node 20+ and pnpm | v0 prototype, LSP client, SDK tests |
+| Node 22.13+ and pnpm 11 | v0 prototype, LSP client, SDK tests. pnpm 11 loads `node:sqlite`, so 22.13 is a hard floor, not a preference. |
 | git | version control, one commit per task |
 | make | build orchestration |
 | golangci-lint | linting |
