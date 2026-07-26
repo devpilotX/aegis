@@ -97,14 +97,18 @@ test "blocks large EU transfer without approval" {
 ## I. Architecture
 
 ```
-source -> NFC normalise -> lex -> parse -> desugar -> bind -> typecheck
+source -> validate UTF-8 -> lex -> parse -> desugar -> bind -> typecheck
        -> analyse -> canonical IR -> { bytecode, audit report }
                                        |
                              request -> PDP -> decision + justification
                                        -> evidence record (signed, chained)
 ```
 
-Specs, one per component: `01-lexer`, `02-parser`, `03-semantics`, `04-type-system`, `05-static-analysis`, `06-ir-compiler`, `07-runtime-pdp`, `08-audit-evidence`, `09-cli-tooling`, `10-lsp`, `11-wasm-embed`, `12-conformance`.
+Source is never normalised. Spans address the raw file bytes as authored; see `docs/02` section 1.1 for why.
+
+Specs, one per component: `01-lexer`, `02-parser`, `03-semantics`, `04-type-system`, `05-static-analysis`, `06-ir-compiler`, `07-runtime-pdp`, `08-audit-evidence`, `09-cli-tooling`, `10-lsp`, `11-wasm-embed`, `12-conformance`, `13-diagnostics`.
+
+`13-diagnostics` is the diagnostics engine and error catalogue, delivered in Phase 3. It was missing from the original twelve, which left Phase 3 with no spec to work from.
 
 ## J. Why Go for v1
 

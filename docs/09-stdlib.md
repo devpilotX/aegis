@@ -2,16 +2,48 @@
 
 The standard library is data and pure functions only. It performs no I/O and adds no expressive power beyond the core language.
 
+## The prelude
+
+Every compilation unit is compiled in a prelude scope containing these predeclared identifiers. They are lexed as ordinary identifiers, not keywords, per the admission rule in `docs/02` section 1.5.1. Shadowing any of them is `AEG-4011`.
+
+| Group | Names |
+|---|---|
+| Request roots (closed set of 9) | `subject` `action` `resource` `context` `model` `evals` `trace` `human` `clock` |
+| Constructors and pure functions | `money` `duration` `percent` `convert` `eval` `card` `is_some` `is_none` |
+| Obligation and effect namespaces | `audit` `notify` `disclose` |
+
+### Predeclared enums
+
+The values that declaration fields accept are members of these enums, resolved nominally by the checker. They are identifiers, never keywords.
+
+| Enum | Ordered members | Used by |
+|---|---|---|
+| `criticality` | `low` `medium` `high` `critical` | `capability.criticality` |
+| `principal_scope` | `workspace` `tenant` `global` | `principal.scope` |
+| `mfa_requirement` | `required` `optional` | `principal.mfa` |
+
+`principal_scope` is named for the enum, not for the field, so that the field label `scope` and the enum type do not collide in one namespace.
+
+## Currency table
+
+Currency codes are ISO 4217 alpha-3. The table is **versioned data with an explicit revision identifier**, exactly like a clause library, and is populated in Phase 4 rather than Phase 1:
+
+```
+iso4217:2024-01-01
+```
+
+An unknown code passed to `money(...)` or `convert(..., to:)` is `AEG-4140`, raised by the checker. The lexer performs no currency validation of any kind: `EUR` and `Set` are the same lexical class and a scanner cannot tell them apart.
+
 ## `std.core`
 
 | Symbol | Type | Notes |
 |---|---|---|
-| `money(n, CUR)` | `(Decimal, Currency) -> Money[CUR]` | The only Money constructor |
+| `money(n, CUR)` | `(Decimal, Currency) -> Money[CUR]` | The only Money constructor. Unknown `CUR` is `AEG-4140`. |
 | `convert(m, to:, rate:)` | `(Money[A], Currency, Decimal) -> Money[B]` | Rate is an attribute; recorded in evidence |
-| `duration(n, unit)` | `(Int, Unit) -> Duration` | `y` = 365d, `w` = 7d exactly |
-| `percent(n)` | `Decimal -> Percent` | |
+| `duration(n, unit)` | `(Int, Unit) -> Duration` | `y` = 365d, `w` = 7d exactly. Out of range is `AEG-4141`. |
+| `percent(n)` | `Decimal -> Percent` | The `85%` form is the same value, built by the parser |
 | `card(s)` | `Set[T] -> Int` | Cardinality |
-| `is_some(o)` / `is_none(o)` | `Optional[T] -> Bool` | Narrowing predicates |
+| `is_some(o)` / `is_none(o)` | `Optional[T] -> Bool` | Predicates only. They do **not** narrow; use `is some v` for that. |
 
 ## `std.eval`
 

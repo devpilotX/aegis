@@ -27,7 +27,7 @@ Coverage is a floor, not a goal. A 100%-covered evaluator with no property tests
 
 ## Properties that MUST hold
 
-1. Lexing then reprinting a token stream reproduces the source modulo whitespace.
+1. Reprinting the token stream **together with its trivia** reproduces the source **byte for byte**. Comments and whitespace are trivia, not discarded text, so the weaker "modulo whitespace" form of this property is superseded: it was unachievable while comments were being dropped, and it is now both stronger and true.
 2. Parse, print, parse again yields an identical AST.
 3. Semantic-preserving source edits yield an identical canonical IR.
 4. The same bundle and request yield an identical decision, justification, and evidence body, every time, on every platform.
@@ -38,7 +38,7 @@ Coverage is a floor, not a goal. A 100%-covered evaluator with no property tests
 
 ## Fuzzing
 
-Four targets, continuous in CI, 24 hours before any release. Criteria: zero panics, zero non-termination, zero out-of-bounds. Seed corpus grows from every conformance case and every historical crash. Any crash is a release blocker.
+Four targets, continuous in CI. **60 seconds in the pre-commit path, 24 hours nightly and before any release.** Criteria: zero panics, zero non-termination, zero out-of-bounds. Seed corpus grows from every conformance case and every historical crash. Any crash is a release blocker.
 
 ## Differential testing
 
