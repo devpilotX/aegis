@@ -20,7 +20,7 @@ A governance language that is merely mostly correct is worthless, because its ou
 
 ## Layer 0 - corpus consistency, already enforced
 
-`node scripts/check-corpus.mjs`, gated by `.github/workflows/corpus.yml` on every push and pull request. Nine checks: keyword arithmetic and steering drift, grammar terminal classification, forward and reverse catalogue closure, suppression-marker validity, retired codes anywhere, retired constructs in AEGIS code, commit trailer form, and declared toolchain version agreement. Every accepted suppression is printed on every run, passing or failing, for the same reason AEG-2100 puts suppressed advisories in the audit report. It runs before any compiler exists because the defect it catches - a document contradicting the specification - is the one that has actually occurred.
+`node scripts/check-corpus.mjs`, gated by `.github/workflows/corpus.yml` on every push and pull request. Ten checks: keyword arithmetic and steering drift, grammar terminal classification, forward and reverse catalogue closure, suppression-marker validity, retired codes anywhere, retired constructs in AEGIS code, commit trailer form, declared toolchain version agreement, and declared numeric limit agreement across docs/02, the canon, and the v0 constants. Every accepted suppression is printed on every run, passing or failing, for the same reason AEG-2100 puts suppressed advisories in the audit report. It runs before any compiler exists because the defect it catches - a document contradicting the specification - is the one that has actually occurred.
 
 ## Coverage floors - CI-enforced
 
