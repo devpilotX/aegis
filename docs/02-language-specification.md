@@ -53,7 +53,15 @@ Only the first six rows are lexical. The rest are detected by the first componen
 
 ### 1.3 Line terminators and whitespace
 
-LF, CRLF, and lone CR MUST all terminate a line. Whitespace is insignificant except as a token separator.
+**LF (U+000A) is the sole line terminator.**
+
+A CR (U+000D) immediately preceding an LF is part of that terminator. A CRLF file therefore lexes identically to an LF file, and the CR is **not** part of the line's text.
+
+A CR in any other position is `AEG-1007`, "carriage return not followed by a line feed". A lone CR makes column counting and line-length measurement ambiguous - is it a terminator, or a character on the line? - and an ambiguous position is an I2 violation, because two implementations would report different columns for the same byte. It is detectable in one forward pass with one byte of lookahead, so the check costs nothing.
+
+**U+0085 NEL, U+2028 LINE SEPARATOR, and U+2029 PARAGRAPH SEPARATOR are ordinary characters and are never line terminators.** This is stated explicitly because it is the single most likely place a contributor will add Unicode awareness helpfully: a scanner that treated U+2028 as a terminator would make line numbers depend on the Unicode version in use, and would let a policy's rendered line numbering differ from what every editor and diff tool shows.
+
+Whitespace is space and tab only, and is insignificant except as a token separator. Whitespace and line terminators are trivia (section 1.4).
 
 ### 1.4 Comments
 
@@ -216,6 +224,14 @@ Maximal munch resolves every overlap: `//` before `/`, `///` before `//`, `<=` b
 | Tab | One column; renders as one space in the caret line |
 | Line length limit | Measured in **bytes** (`AEG-1011`) |
 
+**The line-length limit measures the line's text and excludes its terminator.** A line of exactly 4,096 bytes followed by CRLF is legal, and so is the same line followed by LF. Counting the terminator would make the same text legal or illegal depending on how the file was saved, which is the sort of accident that produces a diagnostic nobody can reproduce.
+
+**A file ending in LF does not gain a final empty line.** A file of three lines each ending in LF has three lines, not four, and its last reportable position is at the end of line three.
+
+**A file not ending in LF is legal.** Its last line simply has no terminator. Whether to add one is a formatter question, not a lexer one, and no diagnostic is emitted for it.
+
+**A byte offset equal to the file length is a valid position.** It is the end-of-file position, and it renders as the end of the last line. `eofToken`'s span is zero-width there. This is what makes "expected a declaration, found end of file" reportable at a real location rather than at a sentinel.
+
 Two different units appear on one axis: `AEG-1011` counts bytes while a column counts scalar values. That is acceptable only because it is now stated. The byte count is what bounds memory; the scalar count is what makes a caret land where the author's editor puts the cursor.
 
 A token stores its span and nothing else about position. Line and column are derived on demand from a line index, so that the scanner's hot path stays branch-light and so that no token can carry a stale position.
@@ -228,10 +244,13 @@ A token stores its span and nothing else about position. Line and column are der
 AEG-1001  invalid UTF-8
 AEG-1002  bidirectional override
 AEG-1004  non-ASCII identifier
+AEG-1007  carriage return not followed by a line feed
 AEG-1005  unexpected character
 literal-form codes    AEG-1040 1041 1042 1055 1056 1057
 limit codes           AEG-1011 1012 1014 1019
 ```
+
+`AEG-1007` precedes `AEG-1005` because a lone CR would otherwise be reported as a merely unexpected character, which tells the author nothing about the line ending that produced it.
 
 **Two fatal errors stop lexing**, because neither permits meaningful progress: `AEG-1010`, the file is larger than the compiler will accept, and `AEG-1001`, invalid UTF-8, where advancing would require guessing a boundary and repair is forbidden by section 1.1.
 
