@@ -68,6 +68,8 @@ Severity is one of `error`, `warning`, `advisory`, `note`. A diagnostic without 
 | 1005 | unexpected character | also covers illegal underscore placement in a numeric literal |
 | 1006 | too many lexical errors, stopping | **fatal for this file**, at 200 diagnostics; the build cap is `AEG-0001` |
 | 1007 | carriage return not followed by a line feed | LF is the sole terminator; a CR is legal only as the first byte of CRLF |
+| 1008 | byte order mark at start of file | **fatal**, pre-scan; rejected rather than stripped, because stripping shifts every offset |
+| 1009 | NUL byte in source | **fatal**, pre-scan; valid UTF-8, never valid AEGIS, including inside a string |
 | 1010 | source file exceeds 4 MiB | **fatal** |
 | 1011 | line exceeds 4,096 bytes | measured in bytes; bounds a physical line, not a string value |
 | 1012 | identifier exceeds 128 bytes | `ident` and `TypeIdent` alike |
@@ -121,16 +123,36 @@ A bare "reserved keyword" message is unhelpful when the author's intent has a le
 
 ### Lexical diagnostic precedence - normative
 
-Exactly one diagnostic per lexeme. First match wins; the rest are suppressed.
+Exactly one diagnostic per lexeme. First match wins; the rest are suppressed. The first four are fatal and pre-scan, and produce no token stream at all - see `docs/02` section 1.9 for the pipeline order they follow.
 
 ```
-1001  ->  1002  ->  1004  ->  1007  ->  1005  ->  literal-form codes  ->  limit codes
-                                                  (1040 1041 1042
-                                                   1055 1056 1057)     (1011 1012
-                                                                        1014 1019)
+1010  ->  1001  ->  1008  ->  1009      fatal, pre-scan, no token stream
+  ->  1007  ->  1002  ->  1004  ->  1005
+  ->  literal-form codes (1040 1041 1042 1055 1056 1057)
+  ->  limit codes (1011 1012 1014 1019)
 ```
 
 Without a stated order, two conforming implementations would report different codes for the same byte, and diagnostic codes are part of the conformance surface. `AEG-1007` precedes `AEG-1005` so that a stray CR is reported as the line-ending problem it is.
+
+### AEG-1001 is the one diagnostic with no position
+
+Every other diagnostic in this catalogue renders with `--> file:line:col` and a source excerpt. `AEG-1001` cannot: line and column are derived from the line index, the index may only be built over valid UTF-8, and the whole point of `AEG-1001` is that the bytes are not valid UTF-8.
+
+It therefore renders with a **byte offset and a hex dump of up to eight bytes** beginning at the offending byte, and no excerpt:
+
+```
+error[AEG-1001]: invalid UTF-8 byte sequence
+  --> payments.aegis, byte offset 1428
+   |
+   = note: bytes at this offset: ED A0 80 20 72 65 67 69
+   = note: ED A0 80 encodes the surrogate U+D800, which UTF-8 forbids
+   = help: re-save the file as UTF-8; a surrogate pair in the output usually
+           means the source was written as CESU-8 or WTF-8
+```
+
+The P3 renderer MUST NOT assume every diagnostic has a line and column. This is stated here because that assumption is the natural one to make, and `AEG-1001` is the only counterexample in the catalogue.
+
+`AEG-1008`'s help MUST be the literal instruction *save the file as UTF-8 without a byte order mark*. `AEG-1009`'s help MUST be *this file may be binary, or saved as UTF-16 - AEGIS source must be UTF-8*. Both are the fix rather than a description of the problem, and both will be hit by real contributors on their first day.
 
 `AEG-1007`'s help MUST name the fix: convert the file to LF endings, or to CRLF consistently. A lone CR is almost always an artifact of a mangled merge or an editor misconfiguration, and saying so saves the author a search.
 

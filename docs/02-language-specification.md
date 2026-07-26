@@ -12,6 +12,24 @@ Key words: MUST, MUST NOT, SHOULD, MAY carry their usual normative force.
 
 Source text MUST be valid UTF-8. Invalid UTF-8 is `AEG-1001` and is fatal (section 1.9).
 
+**`AEG-1001` rejects exactly these seven classes.** The list is normative and closed, because "valid UTF-8" is a phrase two implementations can read differently, and a decoder that silently accepts one of these would let two conforming toolchains disagree about what a policy says.
+
+| # | Rejected | Example bytes |
+|---|---|---|
+| 1 | A continuation byte in leader position | `80`, `BF` |
+| 2 | A truncated sequence, including truncation at end of file | `E2 82` |
+| 3 | An overlong encoding: any codepoint written in more bytes than the minimum | `C0 AF` for `/` |
+| 4 | A surrogate codepoint `U+D800`-`U+DFFF` encoded as UTF-8 (CESU-8, WTF-8) | `ED A0 80` |
+| 5 | A codepoint above `U+10FFFF` | `F4 90 80 80` |
+| 6 | A five- or six-byte sequence | `F8 88 80 80 80` |
+| 7 | The leader bytes that can never be valid | `C0`, `C1`, `F5`-`FF` |
+
+**A byte order mark at the start of the file is `AEG-1008` and is fatal.** A leading `U+FEFF` is rejected, not stripped. Stripping it would shift every byte offset by three, and a span is an offset into the raw file bytes (I2); accepting it would put the mark inside the first token's span, where no author put it. The help text is literal, because the fix is: *save the file as UTF-8 without a byte order mark*. This will be the most frequently hit diagnostic in the catalogue for contributors on editors that add a mark by default.
+
+A `U+FEFF` at any other offset is an ordinary character for now. **OPEN:** it belongs with the invisible-character and confusable work in `AEG-1002`/`AEG-1003`, and is deliberately not decided here.
+
+**A NUL byte anywhere in the source is `AEG-1009` and is fatal.** `U+0000` is valid UTF-8 and is never valid AEGIS, including inside a string literal. It is detected before scanning because the early message is the useful one: a NUL almost always means the file is binary or was saved as UTF-16, and the help text says exactly that. Discovering it at scan time would produce a puzzling complaint about an unexpected character instead.
+
 **No normalisation is ever performed.** An implementation MUST NOT apply NFC, NFD, NFKC, NFKD, case folding, or any other transformation to source text at any stage. Two consequences are normative: spans are offsets into the raw file bytes as authored, and every lexical check operates on those same raw bytes.
 
 The reasoning is worth recording, because the opposite choice looks harmless. Identifiers are ASCII-only (section 1.6), so normalisation buys nothing where homoglyph attacks actually matter. Inside a string literal, normalisation would silently rewrite author-visible text - a disclosure notice, a rule reason, a channel name - and that text is hashed as policy identity. A compiler that quietly alters the words of a legally binding artifact is not acceptable at any price in convenience.
@@ -238,13 +256,26 @@ A token stores its span and nothing else about position. Line and column are der
 
 ### 1.9 Lexical error recovery
 
+### 1.9 Lexical pipeline order and error recovery
+
+**The pipeline order is normative.** Each stage may assume its predecessors succeeded.
+
+```
+bytes -> size check -> UTF-8 validity -> BOM check -> NUL check -> line index -> scan
+```
+
+Validation precedes the line index deliberately: the index walks bytes looking for terminators, and it is entitled to assume the bytes are valid UTF-8. An index built over invalid bytes would produce positions that no editor agrees with, which is worse than no index at all.
+
 **Exactly one diagnostic per lexeme.** Where several could apply, the first match in this order wins, and the others are suppressed:
 
 ```
-AEG-1001  invalid UTF-8
+AEG-1010  file too large                             fatal, pre-scan
+AEG-1001  invalid UTF-8                              fatal, pre-scan
+AEG-1008  byte order mark at start of file           fatal, pre-scan
+AEG-1009  NUL byte in source                         fatal, pre-scan
+AEG-1007  carriage return not followed by a line feed
 AEG-1002  bidirectional override
 AEG-1004  non-ASCII identifier
-AEG-1007  carriage return not followed by a line feed
 AEG-1005  unexpected character
 literal-form codes    AEG-1040 1041 1042 1055 1056 1057
 limit codes           AEG-1011 1012 1014 1019
@@ -252,13 +283,15 @@ limit codes           AEG-1011 1012 1014 1019
 
 `AEG-1007` precedes `AEG-1005` because a lone CR would otherwise be reported as a merely unexpected character, which tells the author nothing about the line ending that produced it.
 
-**Two fatal errors stop lexing**, because neither permits meaningful progress: `AEG-1010`, the file is larger than the compiler will accept, and `AEG-1001`, invalid UTF-8, where advancing would require guessing a boundary and repair is forbidden by section 1.1.
+**The first four are fatal and pre-scan: report exactly one diagnostic and stop.** No token stream is produced, not one token, **not even EOF**, and no later stage is attempted. This is not a truncated lex; it is a file that could not be lexed at all, and a caller that received a token stream from it would be entitled to believe otherwise.
+
+**`AEG-1006` is fatal but mid-scan.** The 200-diagnostic cap is reached with a partial token stream already built, so that stream is returned and it ends with EOF like any other.
 
 **Every other lexical error skips the offending lexeme and continues**, so that one pass reports every lexical defect in the file rather than one per compile.
 
 **Diagnostics are capped at 200 per file.** On reaching the cap the lexer emits `AEG-1006` and stops lexing that file. A second cap of 2,000 diagnostics across a whole build is enforced by the driver and stops the build with `AEG-0001`. An unbounded diagnostic list on hostile input is a memory-growth hazard, and I11 does not stop being true because the input is invalid.
 
-**Exactly one EOF token is always emitted**, on every path. For an empty file its span is `[0, 0)`. After a fatal error its span is zero-width at the offset where lexing stopped. The parser may therefore assume EOF exists without a special case.
+**Where a token stream exists, it ends with exactly one EOF token.** For an empty file - which is valid - the stream is EOF alone, with span `[0, 0)`. After a mid-scan fatal, EOF sits zero-width at the offset where scanning stopped. A parser handed a token stream may therefore assume EOF without a special case; a parser handed a pre-scan failure is handed no stream to parse.
 
 ---
 

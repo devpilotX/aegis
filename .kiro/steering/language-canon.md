@@ -165,6 +165,8 @@ Source is valid UTF-8 and is **never normalised** - not NFC, not anything. Spans
 
 **LF is the sole line terminator.** A CR is legal only immediately before an LF, where it is part of the terminator and not part of the line's text; anywhere else it is `AEG-1007`. U+0085, U+2028, and U+2029 are ordinary characters and never terminate a line. The 4,096-byte line limit excludes the terminator.
 
+**The pipeline order is normative:** size, UTF-8 validity, BOM, NUL, line index, scan. The first four failures are fatal and produce no token stream at all, not even EOF: `AEG-1010`, `AEG-1001`, `AEG-1008` (a leading byte order mark, rejected and never stripped), and `AEG-1009` (a NUL byte anywhere, including inside a string). An empty file is valid and lexes to EOF alone.
+
 ## Request object roots - closed set
 
 `subject` `action` `resource` `context` `model` `evals` `trace` `human` `clock`
