@@ -1,5 +1,11 @@
 # AEGIS
 
+> **Status: pre-implementation.** Phase 0 (design and specification) is
+> complete. No compiler exists yet. The specification in `docs/` is
+> normative and stable; `examples/draft/` contains aspirational syntax that
+> does not yet parse. Phase 1 (lexer) is in progress.
+> Roadmap: `docs/14-roadmap.md`.
+
 **A**gent **E**nforcement & **G**overnance **I**nstruction **S**pecification
 
 > An independent, self-contained programming language whose programs are written, read, and executed as machine-enforceable governance for AI agents.
@@ -102,7 +108,7 @@ Read in this order. Do not skip.
 | Formal grammar | Complete |
 | Type system | Complete |
 | Operational semantics | Complete |
-| Implementation | Not started — this package is the input to implementation |
+| Implementation | Phase 1 (lexer) in progress — no compiler exists yet |
 
 ---
 
