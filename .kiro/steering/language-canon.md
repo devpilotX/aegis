@@ -163,6 +163,8 @@ Type names are `TypeIdent`, `[A-Z][A-Za-z0-9_]*`, with square-bracket arguments:
 
 Source is valid UTF-8 and is **never normalised** - not NFC, not anything. Spans are half-open, 0-based, raw file bytes. Rendered line and column are 1-based and the column counts Unicode scalar values. Comments and whitespace are trivia retained on the following token, so tokens plus trivia reprint the source byte for byte.
 
+**LF is the sole line terminator.** A CR is legal only immediately before an LF, where it is part of the terminator and not part of the line's text; anywhere else it is `AEG-1007`. U+0085, U+2028, and U+2029 are ordinary characters and never terminate a line. The 4,096-byte line limit excludes the terminator.
+
 ## Request object roots - closed set
 
 `subject` `action` `resource` `context` `model` `evals` `trace` `human` `clock`

@@ -67,6 +67,7 @@ Severity is one of `error`, `warning`, `advisory`, `note`. A diagnostic without 
 | 1004 | non-ASCII identifier not permitted | |
 | 1005 | unexpected character | also covers illegal underscore placement in a numeric literal |
 | 1006 | too many lexical errors, stopping | **fatal for this file**, at 200 diagnostics; the build cap is `AEG-0001` |
+| 1007 | carriage return not followed by a line feed | LF is the sole terminator; a CR is legal only as the first byte of CRLF |
 | 1010 | source file exceeds 4 MiB | **fatal** |
 | 1011 | line exceeds 4,096 bytes | measured in bytes; bounds a physical line, not a string value |
 | 1012 | identifier exceeds 128 bytes | `ident` and `TypeIdent` alike |
@@ -123,13 +124,15 @@ A bare "reserved keyword" message is unhelpful when the author's intent has a le
 Exactly one diagnostic per lexeme. First match wins; the rest are suppressed.
 
 ```
-1001  ->  1002  ->  1004  ->  1005  ->  literal-form codes  ->  limit codes
-                                        (1040 1041 1042
-                                         1055 1056 1057)     (1011 1012
-                                                              1014 1019)
+1001  ->  1002  ->  1004  ->  1007  ->  1005  ->  literal-form codes  ->  limit codes
+                                                  (1040 1041 1042
+                                                   1055 1056 1057)     (1011 1012
+                                                                        1014 1019)
 ```
 
-Without a stated order, two conforming implementations would report different codes for the same byte, and diagnostic codes are part of the conformance surface.
+Without a stated order, two conforming implementations would report different codes for the same byte, and diagnostic codes are part of the conformance surface. `AEG-1007` precedes `AEG-1005` so that a stray CR is reported as the line-ending problem it is.
+
+`AEG-1007`'s help MUST name the fix: convert the file to LF endings, or to CRLF consistently. A lone CR is almost always an artifact of a mangled merge or an editor misconfiguration, and saying so saves the author a search.
 
 ## Warnings and advisories (AEG-2xxx)
 

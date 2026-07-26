@@ -26,10 +26,16 @@ Two things this component deliberately does **not** do, both settled by the P0 a
 **User story:** As a tool author, I need positions to behave exactly as specified, so that the artifact can be trusted.
 
 2.1. WHEN any token is emitted THEN its span SHALL be a pair of 0-based raw file byte offsets from which line and column are derivable.
-2.2. WHEN the source contains CRLF, LF, or lone CR THEN line counting SHALL treat each as a single terminator.
-2.3. WHEN a position is rendered THEN line and column SHALL be 1-based and the column SHALL count Unicode scalar values, not bytes and not grapheme clusters.
-2.4. WHEN a tab appears before a caret position THEN it SHALL count as one column and render as one space.
-2.5. WHEN a token is constructed THEN it SHALL NOT store a line or column; positions SHALL be derived from a line index.
+2.2. WHEN the source contains LF THEN it SHALL terminate a line, and WHEN a CR immediately precedes an LF THEN the CR SHALL be part of that terminator and SHALL NOT be part of the line's text.
+2.3. WHEN a CR appears in any other position THEN the lexer SHALL emit AEG-1007.
+2.4. WHEN U+0085, U+2028, or U+2029 appears THEN it SHALL be treated as an ordinary character and SHALL NOT terminate a line.
+2.5. WHEN a position is rendered THEN line and column SHALL be 1-based and the column SHALL count Unicode scalar values, not bytes and not grapheme clusters.
+2.6. WHEN a tab appears before a caret position THEN it SHALL count as one column and render as one space.
+2.7. WHEN a token is constructed THEN it SHALL NOT store a line or column; positions SHALL be derived from a line index.
+2.8. WHEN a line's length is measured for AEG-1011 THEN the terminator SHALL be excluded, so a 4,096-byte line followed by CRLF is legal.
+2.9. WHEN a file ends in LF THEN no additional empty line SHALL be reported, and WHEN a file does not end in LF THEN that SHALL be legal and SHALL produce no diagnostic.
+2.10. WHEN a byte offset equal to the file length is derived THEN it SHALL resolve to the end-of-file position at the end of the last line rather than an error.
+2.11. WHEN an offset is not on a UTF-8 character boundary THEN derivation SHALL return an error rather than a rounded position.
 
 ### 3. Limits
 
