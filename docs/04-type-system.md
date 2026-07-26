@@ -9,10 +9,18 @@
                                  |
                               Percent
                               Money[CUR]      (CUR is part of the type)
-                              Enum<E>         (nominal, ordered)
+                              Enum[E]         (nominal, ordered)
+                              Capability      (nominal reference)
+                              Principal       (nominal reference)
 ```
 
 `Percent <: Decimal` is the only subtyping relation between base types. `Money[CUR]` is invariant in `CUR`: there is no subtyping between currencies, ever.
+
+Type names are written with `TypeIdent` (`docs/03` section 0.2) and type arguments use **square brackets**: `Enum[E]`, `Set[T]`, `Optional[T]`, `Money[EUR]`. Angle brackets do not exist anywhere in AEGIS. A record type is written `Record{ name: Type, ... }` and has a real grammar production.
+
+**Capability and Principal are nominal reference types, not strings.** `action.capability` has type `Capability` and compares only against a declared `capability` identifier. `action.capability == "payments.transfer"` is a type error, not a shortcut: the quoted form is the `tool` field of a capability, and comparing an action to a tool name would let a policy pass on a string that no declaration governs. `principal` references behave the same way in `escalate to` and `human.approved_by(...)`.
+
+Unary minus (`docs/02` section 5.1) maps `Money[CUR] -> Money[CUR]`, `Decimal -> Decimal`, and `Percent -> Decimal`.
 
 ## The nine normative rules
 
@@ -38,23 +46,30 @@ This gives precise, local error messages: the checker always knows what it expec
 
 ## Optional discharge
 
+The discharge form is `is`, specified in `docs/02` section 5.5. Until that amendment the language's headline safety feature had no syntax.
+
 ```aegis
-// Rejected: AEG-4110
+// Rejected: AEG-4110, resource.reviewer is Optional[Record{...}]
 deny resource.reviewer.role == "finance.approver"
 
-// Accepted: narrowing after an explicit check
-deny exists r in resource.reviewers : r.role == "finance.approver"
+// Accepted: explicit absence test
+deny resource.reviewer is none
+  reason "An unassigned reviewer cannot approve anything."
 
-// Accepted: explicit some/none handling
-deny if resource.reviewer is none then true else false
+// Accepted: presence test that binds and narrows
+deny resource.reviewer is some r and r.role != "finance.approver"
+  reason "The assigned reviewer does not hold the approver role."
+
+// Accepted: quantification never sees an absent element
+deny exists r in resource.reviewers : r.role == "finance.approver"
 ```
 
-After a `some` test, the checker narrows `Optional[T]` to `T` within that branch only.
+After `is some v`, the checker narrows `Optional[T]` to `T` for `v` within that branch only. `is_some(o)` and `is_none(o)` from `std.core` return Bool and do **not** narrow, which is precisely why the `is` form exists.
 
 ## Currency in the type
 
 ```aegis
-// AEG-4101: cannot compare Money[EUR] with Money[USD]
+// AEG-4101: currency mismatch in comparison
 deny resource.amount > money(10_000, USD)
 
 // Accepted: conversion is explicit and carries an auditable rate
@@ -62,6 +77,8 @@ deny resource.amount > convert(money(10_000, USD), to: EUR, rate: fx.eur_usd)
 ```
 
 The rate is an attribute, resolved by the PIP, recorded in the evidence. Nothing about the conversion is implicit or invisible to an auditor.
+
+A currency code is lexed as a `TypeIdent` and validated here, not in the lexer: an unknown code is `AEG-4140`, checked against the versioned ISO 4217 table in `std.core`.
 
 ## Soundness sketch
 

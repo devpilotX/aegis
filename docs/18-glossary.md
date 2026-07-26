@@ -22,23 +22,30 @@
 | **Invariant (I1-I11)** | An absolute property of the language. Non-negotiable. |
 | **IR** | The canonical intermediate representation. Both compilation targets derive from it (I5). |
 | **Justification** | The minimal tree of decisive rules, spans, citations, and referenced bindings (I8). |
+| **Keyword admission rule** | A word is a keyword only if it appears where an identifier could not. Everything else is a predeclared identifier or an enum member (docs/02 section 1.5.1). |
 | **Layer 4** | The governance layer: machine-checkable constraints plus audit evidence. AEGIS's domain. |
 | **Obligation** | A binding action the enforcement point must discharge, with a declared on_failure effect. |
+| **Optional discharge** | Proving a value is present before using it, written `x is none` or `x is some v`. The `some` form binds and narrows. |
 | **PAP** | Policy Administration Point. Authors, signs, distributes bundles. |
 | **PDP** | Policy Decision Point. The pure, total evaluator. |
 | **PEP** | Policy Enforcement Point. Intercepts the action; fails closed. |
 | **PIP** | Policy Information Point. The only component permitted to perform I/O. |
 | **Policy** | A combining algorithm, a target, rules, a default, and a violation handler. |
+| **Predeclared identifier** | A name bound in the prelude scope and lexed as an identifier, not a keyword. Shadowing one is AEG-4011. |
+| **Prelude** | The implicit scope holding the nine request roots, the pure constructors, and the predeclared enums. |
 | **Principal** | An actor or approver, with role, scope, and MFA requirement. |
 | **Purity** | The evaluator performs no I/O of any kind (I3). |
 | **Reason** | Mandatory human-readable text on any rule that can deny or escalate. |
+| **Release build** | `aegis build --release`. Strict, and additionally fails if any in-language test fails. |
 | **Resource bound** | The statically computed worst-case evaluation cost, reported by the compiler (I11). |
 | **Rule** | Condition, effect, reason, obligations. |
 | **Schema** | The declared request surface. All attribute access is checked against it. |
 | **Self-hosting** | Writing a language's compiler in itself. Deliberately rejected here. |
 | **Soundness** | Never reporting a program safe when it is not. Preferred over completeness. |
-| **Span** | A half-open source range, carried through every phase onto every diagnostic. |
+| **Span** | A half-open range of **raw file bytes**, 0-based, carried through every phase onto every diagnostic. Rendered line and column are 1-based, and the column counts Unicode scalar values. |
+| **Strict mode** | `aegis build --strict`. Escalates every 2xxx advisory to an error. |
 | **Subsumption** | One rule's condition implying another's, making the second redundant. |
 | **Tamper-evident** | Alteration is detectable. Not the same as tamper-proof. Say the accurate word. |
 | **Totality** | Every program terminates, proven statically, never by timeout (I1). |
 | **Trace** | The bounded, ordered event sequence supplied in the request, over which temporal operators evaluate. |
+| **Trivia** | Whitespace, line terminators, and comments. Produces no syntactic token, is retained on the following token, and makes reprinting byte-exact. |

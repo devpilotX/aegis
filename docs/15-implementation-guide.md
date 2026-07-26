@@ -23,6 +23,18 @@ node --version && npx tsc --version && go version && git --version && make --ver
 
 ## 2. Repository layout
 
+**v0, Phases 1-5, TypeScript.** Throwaway by design, but it is where the language shape is discovered, so it gets a real layout.
+
+```
+v0/
+  package.json tsconfig.json vitest.config.ts
+  src/token/ src/lexer/ src/diag/ src/ast/ src/parser/
+  src/desugar/ src/types/ src/check/ src/eval/
+  conformance-runner/
+```
+
+**v1, Phase 6 onward, Go.** A translation of v0, verified by differential testing.
+
 ```
 aegis/
   cmd/aegis/                  argument parsing only, no logic
@@ -31,11 +43,13 @@ aegis/
     types/ check/ analysis/
     ir/ compile/ vm/ combine/
     evidence/ report/ diag/ lsp/
-  spec/  conformance/{valid,invalid,canonical}
+  conformance/{valid,invalid,canonical}
   examples/  templates/  docs/
 ```
 
-Dependencies flow downward only. `lexer` never imports `parser`. `vm` never imports `parser`. Files stay under 600 lines, functions under 60.
+There is no `spec/` directory. `docs/03-grammar.md` is the normative grammar and there is exactly one home for it.
+
+Dependencies flow downward only. `lexer` never imports `parser`. `vm` never imports `parser`. Files stay under 600 lines, functions under 60, in both implementations.
 
 ## 3. Why the parser is hand-written
 
