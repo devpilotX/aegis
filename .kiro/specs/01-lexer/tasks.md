@@ -7,7 +7,7 @@ Work strictly top to bottom. One task per turn. Do not start a task until the pr
 <!-- retired-ok: AEG-1013 -->
 This list was rewritten after the P0 audit adjudication. Three tasks that instructed work the requirements did not authorise are gone: NFC normalisation (no normalisation happens at all), currency validation (`AEG-4140`, checker), and the non-lexical limits formerly numbered `AEG-1013`, `1016`, `1017`, `1018`, now `AEG-3083`, `4160`, `3081`, `3082` and owned by the parser, checker, and loader. Two tasks are new: trivia retention and the lexer conformance corpus.
 
-- [ ] **1.1** Define the token kind enumeration and the Token type with span
+- [x] **1.1** Define the token kind enumeration and the Token type with span
 - [ ] **1.2** Implement the line index and lazy 1-based line/column derivation over scalar values
 - [ ] **1.3** Implement UTF-8 validation at the boundary as a fatal check (AEG-1001)
 - [ ] **1.4** Implement the core scanner loop with maximal munch, the delimiter set, and AEG-1005

@@ -1,0 +1,49 @@
+name: v0
+
+# The v0 TypeScript prototype, Phases 1-5. Deliberately a separate workflow from
+# `corpus`: one gates the specification, the other gates the implementation, and
+# a failure in either should be readable without untangling the other.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: v0
+
+jobs:
+  v0:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installed before setup-node so the pnpm cache is available to it. The
+      # version comes from the pinned `packageManager` field rather than being
+      # repeated here, so there is one place to change it.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: v0/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: v0/pnpm-lock.yaml
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      # `coverage` runs the suite and enforces the floor from
+      # .kiro/steering/testing.md in one pass. Running `test` separately would
+      # execute every test twice and leave the floor unenforced, which is how a
+      # configured threshold quietly becomes decorative.
+      - name: test and coverage floor
+        run: pnpm coverage
