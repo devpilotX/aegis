@@ -369,17 +369,92 @@ function checkRetiredConstructs(fail) {
 /**
  * Two rules, the second of which activates itself.
  *
- * 1. The HEAD commit MUST carry a `Task:` trailer. This asserts something on
- *    every run from now on, in any trailer format.
- * 2. Once `v0/` exists in the tree, HEAD's trailer MUST be a numeric id that
- *    exists in the tasks.md of the spec its `Spec:` trailer names. A prose
- *    trailer such as "pre-1.1 P0 amendment" is accepted only while there is no
- *    implementation, which is exactly the window in which prose is honest.
+ * 1. The HEAD commit MUST carry `Spec:` and `Task:` trailers in one of exactly
+ *    two forms, per `.kiro/steering/conventions.md`:
+ *      - `Spec: <spec-id>` + `Task: <n.n>`, where the id exists in that spec's
+ *        tasks.md;
+ *      - `Spec: none` + `Task: infra`, legal only for a build, chore, ci, or
+ *        docs commit.
+ * 2. Once `v0/` exists in the tree, a prose task description is no longer
+ *    accepted in place of a numeric id. A prose trailer is honest only while
+ *    there is no implementation.
  *
- * Every numeric trailer in reachable history is checked as well. Skipped rather
- * than failed when git is unavailable: a checkout without history is not a
- * corpus defect, and the workflow requests enough depth to avoid it.
+ * Every numeric trailer in reachable history is checked for existence as well.
+ * Commits predating the convention carry prose descriptions and are deliberately
+ * not rewritten, so history is checked for existence only, never for form.
+ *
+ * Skipped rather than failed when git is unavailable: a checkout without history
+ * is not a corpus defect, and the workflow requests enough depth to avoid it.
  */
+
+/** Commit types permitted to use the `Task: infra` form. */
+const INFRA_TYPES = ["build", "chore", "ci", "docs"];
+
+/** Extract the conventional-commit type from a subject line, if it has one. */
+function commitType(subject) {
+  const m = subject.match(/^([a-z]+)(\([^)]*\))?!?:/);
+  return m ? (m[1] ?? null) : null;
+}
+
+function checkHeadTrailers(ctx) {
+  const { fail, note, headSha, headBody, specTasks, implementationExists } = ctx;
+  const subject = headBody.split("\n")[0] ?? "";
+  const where = `commit ${headSha} (HEAD)`;
+  const task = headBody.match(/^Task:\s*(.+)$/m);
+  const spec = headBody.match(/^Spec:\s*(.+)$/m);
+
+  if (!task) {
+    fail(where, null,
+      "commit message has no `Task:` trailer; every commit must name the task it completes\n" +
+      "      use `Spec: <id>` + `Task: <n.n>`, or `Spec: none` + `Task: infra` for toolchain work");
+    return;
+  }
+  if (!spec) {
+    fail(where, null, "commit message has a `Task:` trailer but no `Spec:` trailer");
+    return;
+  }
+
+  const id = task[1].trim();
+  const specValue = spec[1].trim();
+  const type = commitType(subject);
+
+  if (id === "infra") {
+    if (specValue !== "none") {
+      fail(where, null, `\`Task: infra\` requires \`Spec: none\`, found \`Spec: ${specValue}\``);
+    }
+    if (type === null) {
+      fail(where, null, "`Task: infra` requires a conventional-commit type, and the subject has none");
+    } else if (!INFRA_TYPES.includes(type)) {
+      fail(where, null,
+        `\`Task: infra\` is not legal for a \`${type}:\` commit; it is limited to ${INFRA_TYPES.join(", ")}\n` +
+        "      a commit that changes behaviour or specification must name the task that owns it");
+    }
+    return;
+  }
+
+  if (!/^\d+(\.\d+)*$/.test(id)) {
+    if (implementationExists) {
+      fail(where, null,
+        `\`Task: ${id}\` is neither a numeric task id nor \`infra\`, and v0/ exists\n` +
+        "      prose task descriptions were accepted only before there was an implementation");
+    } else {
+      note(`check 6: v0/ absent, so HEAD's prose trailer "${id}" is accepted`);
+    }
+    return;
+  }
+
+  const named = specValue.split(",").map((s) => s.trim()).filter((s) => specTasks.has(s));
+  if (named.length === 0) {
+    fail(where, null,
+      `\`Spec: ${specValue}\` names no known spec id; expected one of ${[...specTasks.keys()].join(", ")}`);
+    return;
+  }
+  if (!named.some((s) => specTasks.get(s).has(id))) {
+    fail(where, null,
+      `Task: ${id} does not exist in ${named.map((c) => `.kiro/specs/${c}/tasks.md`).join(" or ")}`);
+  }
+}
+
 function checkTaskTrailers(fail, note) {
   let log;
   let headBody;
@@ -409,36 +484,14 @@ function checkTaskTrailers(fail, note) {
     return;
   }
 
-  const implementationExists = existsSync(join(ROOT, "v0"));
-  const headTask = headBody.match(/^Task:\s*(.+)$/m);
-  const headSpec = headBody.match(/^Spec:\s*(.+)$/m);
-
-  if (!headTask) {
-    fail(`commit ${headSha} (HEAD)`, null,
-      "commit message has no `Task:` trailer; every commit must name the task it completes\n" +
-      "      see the trailer format in .kiro/steering/conventions.md");
-  } else if (implementationExists) {
-    const id = headTask[1].trim();
-    if (!/^\d+(\.\d+)*$/.test(id)) {
-      fail(`commit ${headSha} (HEAD)`, null,
-        `Task: ${id} is prose, but v0/ exists, so the trailer must be a numeric task id\n` +
-        "      prose trailers are accepted only before there is an implementation");
-    } else if (!headSpec) {
-      fail(`commit ${headSha} (HEAD)`, null,
-        `Task: ${id} is numeric but there is no \`Spec:\` trailer naming which tasks.md it belongs to`);
-    } else {
-      const named = headSpec[1].split(",").map((s) => s.trim()).filter((s) => specTasks.has(s));
-      if (named.length === 0) {
-        fail(`commit ${headSha} (HEAD)`, null,
-          `\`Spec: ${headSpec[1].trim()}\` names no known spec id; expected one of ${[...specTasks.keys()].join(", ")}`);
-      } else if (!named.some((s) => specTasks.get(s).has(id))) {
-        fail(`commit ${headSha} (HEAD)`, null,
-          `Task: ${id} does not exist in ${named.map((c) => `.kiro/specs/${c}/tasks.md`).join(" or ")}`);
-      }
-    }
-  } else {
-    note(`check 6: v0/ absent, so HEAD's prose trailer "${headTask[1].trim()}" is accepted`);
-  }
+  checkHeadTrailers({
+    fail,
+    note,
+    headSha,
+    headBody,
+    specTasks,
+    implementationExists: existsSync(join(ROOT, "v0")),
+  });
 
   let examined = 0;
   for (const chunk of log.split("--END--")) {
@@ -485,8 +538,89 @@ function checkReverseClosure(fail, cat, refs) {
 }
 
 // ---------------------------------------------------------------------------
-// runner
+// 9 - the declared toolchain versions agree with each other
 // ---------------------------------------------------------------------------
+
+/**
+ * The Node floor is declared in four places and drifted within an hour of being
+ * introduced: the v0 job said 20 while pnpm required 22.13. A version stated
+ * four times is a version that will disagree with itself, so the agreement is
+ * asserted rather than remembered.
+ *
+ * The `corpus` workflow is deliberately excluded. Its script has no dependencies
+ * and no package manager, so its Node floor is genuinely independent and lower.
+ */
+const TOOLCHAIN_SOURCES = [
+  {
+    label: "v0/package.json engines.node",
+    file: "v0/package.json",
+    re: /"node"\s*:\s*">=(\d+\.\d+)"/,
+  },
+  {
+    label: ".github/workflows/v0.yml node-version",
+    file: ".github/workflows/v0.yml",
+    re: /node-version:\s*'(\d+\.\d+)'/,
+  },
+  {
+    label: ".kiro/steering/tech.md prerequisite table",
+    file: ".kiro/steering/tech.md",
+    re: /Node (\d+\.\d+)\+ and pnpm/,
+  },
+  {
+    label: "docs/15-implementation-guide.md toolchain table",
+    file: "docs/15-implementation-guide.md",
+    re: /\| Node\.js \| (\d+\.\d+)\+ \|/,
+  },
+];
+
+function checkToolchainAgreement(fail) {
+  const found = [];
+  for (const source of TOOLCHAIN_SOURCES) {
+    const m = read(source.file).match(source.re);
+    if (!m) {
+      fail(source.file, null,
+        `no Node floor found where one is required: ${source.label}\n` +
+        "      every declaration of the floor is checked, so a missing one is a defect");
+      continue;
+    }
+    found.push({ label: source.label, version: m[1] });
+  }
+
+  const distinct = [...new Set(found.map((f) => f.version))];
+  if (distinct.length > 1) {
+    fail("v0/package.json", null,
+      `the declared Node floor disagrees across ${found.length} declarations: ${distinct.join(" vs ")}\n      ` +
+      found.map((f) => `${f.version}  ${f.label}`).join("\n      "));
+  }
+
+  // pnpm: the pinned packageManager and the prerequisite table must match.
+  const pinnedPnpm = read("v0/package.json").match(/"packageManager"\s*:\s*"pnpm@(\d+\.\d+\.\d+)"/);
+  const documentedPnpm = read(".kiro/steering/tech.md").match(/and pnpm (\d+\.\d+\.\d+)/);
+  if (!pinnedPnpm) {
+    fail("v0/package.json", null, "no exact pnpm version pinned in `packageManager`");
+  } else if (!documentedPnpm) {
+    fail(".kiro/steering/tech.md", null, "the prerequisite table does not state an exact pnpm version");
+  } else if (pinnedPnpm[1] !== documentedPnpm[1]) {
+    fail(".kiro/steering/tech.md", null,
+      `pnpm version disagrees: package.json pins ${pinnedPnpm[1]}, tech.md documents ${documentedPnpm[1]}`);
+  }
+
+  // vitest and its coverage provider are released in lockstep and must match.
+  const pkg = JSON.parse(read("v0/package.json"));
+  const dev = pkg.devDependencies ?? {};
+  if (dev["vitest"] !== dev["@vitest/coverage-v8"]) {
+    fail("v0/package.json", null,
+      `vitest ${dev["vitest"]} and @vitest/coverage-v8 ${dev["@vitest/coverage-v8"]} must be the same version`);
+  }
+
+  // Exact pins only. A caret in a governance toolchain is a silent upgrade.
+  for (const [name, spec] of Object.entries(dev).sort()) {
+    if (!/^\d+\.\d+\.\d+$/.test(String(spec))) {
+      fail("v0/package.json", null,
+        `devDependency ${name} is "${spec}"; every dependency must be an exact version, with no range`);
+    }
+  }
+}
 
 const failures = [];
 const notes = [];
@@ -504,6 +638,7 @@ const CHECKS = [
   ["retired constructs, in aegis code only", () => checkRetiredConstructs(fail)],
   ["commit task-id trailers", () => checkTaskTrailers(fail, note)],
   ["reverse catalogue closure", () => checkReverseClosure(fail, ctx.cat, ctx.refs)],
+  ["declared toolchain versions agree", () => checkToolchainAgreement(fail)],
 ];
 
 console.log("AEGIS corpus checks\n");
