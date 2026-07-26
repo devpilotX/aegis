@@ -106,7 +106,7 @@ docker build -t aegis-scratch . && docker run --rm aegis-scratch version
 | Tool | Purpose |
 |---|---|
 | Go 1.22+ | v1 implementation |
-| Node 22.13+ and pnpm 11 | v0 prototype, LSP client, SDK tests. pnpm 11 loads `node:sqlite`, so 22.13 is a hard floor, not a preference. |
+| Node 22.13+ and pnpm 11.15.1 | v0 prototype, LSP client, SDK tests. pnpm 11 loads `node:sqlite`, so 22.13 is a hard floor, not a preference. |
 | git | version control, one commit per task |
 | make | build orchestration |
 | golangci-lint | linting |

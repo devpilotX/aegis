@@ -95,6 +95,21 @@ Note what this example is not. There is no money literal to tokenize: `money(...
 
 Allowed types: `feat` `fix` `spec` `test` `perf` `refactor` `docs` `build` `chore`.
 
+### Trailer forms - exactly two, and CI checks them
+
+Every commit carries both a `Spec:` and a `Task:` trailer, in one of these two shapes and no other.
+
+| Form | Trailers | Use for |
+|---|---|---|
+| Feature work | `Spec: <spec-id>` and `Task: <n.n>` | anything that implements or specifies a numbered task; the id MUST exist in that spec's `tasks.md` |
+| Infrastructure | `Spec: none` and `Task: infra` | toolchain, CI, repository, and documentation work that no numbered task owns |
+
+The `infra` form is legal **only** when the commit type is `build`, `chore`, `ci`, or `docs`. A `feat`, `fix`, `spec`, `test`, `perf`, or `refactor` commit carrying `Task: infra` is a failure: those types change behaviour or specification, and behaviour that no task owns is scope creep with a tidy label.
+
+`ci` is accepted as a type here even though it is absent from the list above, because CI work is real and calling it `build` was the alternative.
+
+The rule exists because the corpus checker asserts it against HEAD on every run. Commits made before the convention was introduced carry prose task descriptions and are deliberately not rewritten; only their numeric ids, where present, are still checked.
+
 Use `spec:` when amending `docs/`. Specification amendments go in their own commit, before the code that depends on them (I10).
 
 ## Documentation duty
