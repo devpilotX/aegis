@@ -39,28 +39,17 @@ jobs:
 
       - name: environment
         run: |
-          {
-            echo '### v0 environment'
-            echo '```'
-            echo "node    $(node --version)"
-            echo "pnpm    $(pnpm --version)"
-            echo "cwd     $(pwd)"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=v0 environment::node $(node --version), pnpm $(pnpm --version), cwd $(pwd)"
 
-      # The install output is mirrored into the step summary because job logs
-      # are not readable without a token, and a failure nobody can read costs
-      # more than the six lines that make it readable.
+      # Diagnostics are emitted as annotations rather than only to the log,
+      # because job logs need a token to read and annotations do not. A failure
+      # nobody can read costs more than the four lines that make it readable.
       - name: install
         run: |
           set -o pipefail
           if ! pnpm install --frozen-lockfile 2>&1 | tee /tmp/install.log; then
-            {
-              echo '### pnpm install failed'
-              echo '```'
-              tail -80 /tmp/install.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
+            msg=$(tail -40 /tmp/install.log | sed -e 's/%/%25/g' -e 's/\r//g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=pnpm install failed::${msg}"
             exit 1
           fi
 
