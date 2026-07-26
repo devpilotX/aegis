@@ -166,7 +166,15 @@ There is no operator, no runtime cost, and no ambiguity: the join happens in the
 
 This exists for a specific regulatory reason. An Article 50 transparency notice, a `description`, or a substantial `reason` cannot fit inside a 4,096-byte line, and the alternative - a multi-line string - would make the line-length limit unenforceable and the caret rendering ambiguous. The joined value is bounded at 64 KiB by `AEG-4170`, checked after concatenation, which is where the size of a value can first be known.
 
-Concatenation applies to string literals in value positions: `reason`, `description`, expression operands, and `expect reason contains`. It does **not** apply to a quoted name (`tool`, `role`), to the `specification` version, or to a `test` or `suite` name, all of which must be single atomic literals because they are identities rather than prose.
+Concatenation applies to string literals in value positions: `reason`, `description`, expression operands, and `expect reason contains`. It does **not** apply to a quoted name (`tool`, `role`), to the `specification` version, or to a `test` or `suite` name. Those four are **identities, not prose**: each is hashed as part of policy identity or used as a uniqueness key, so each must be a single literal whose bytes are visible in one place. Joining an identity from fragments would let two declarations that look different hash the same, or the reverse.
+
+**Reserved semantics.** Section 1.5 reserves *words*. This reserves a *meaning*, which is the other way a language drifts:
+
+| Token | Reserved meaning | Never |
+|---|---|---|
+| `%` | postfix percent, forming a Percent literal | modulo, remainder, or any binary use |
+
+There is no modulo operator in AEGIS and there will not be one. Modulo on negative operands has two defensible answers - truncated and floored - and a language whose output is used to answer regulators cannot ship an operator whose result depends on which convention the implementer happened to know. No governance policy has needed it. `85 % 2` is therefore a Percent literal followed by an integer, and the parser reports it with `AEG-3070` carrying help that says so.
 
 **Delimiters and operators - the complete set.**
 
@@ -267,7 +275,9 @@ schema context { region : String, channel : String }
 
 `schema request { ... }` is illegal, because `request` is not a root: `AEG-3024`, with the nine legal names listed in the help line. Before this was settled, a schema named `request` declaring `reviewers` and a rule referring to `resource.reviewers` could both look correct while agreeing about nothing.
 
-At most one schema per root; a second is `AEG-3022`. Fields of a root may be declared across imported packages, which is how a shared schema library works.
+**Schemas do not merge.** Exactly one schema per root, in exactly one package. No contributions from imports, no field merging, no extension, no reopening. A second schema for a root within the unit is `AEG-3022`; a schema for a root that an imported package has already declared is `AEG-3026`.
+
+The rationale is worth recording, because a shared schema library sounds obviously useful. Cross-package field merging would make a root's type depend on the import set, so the same policy text would mean different things in different bundles - and would typecheck in one and not another. That is an I2 violation dressed up as a convenience. A team that wants a shared request surface declares it once, in one package, and imports the policies rather than the fields.
 
 The nine request roots are predeclared identifiers bound in the prelude scope, not keywords (section 1.5.1). Shadowing one with a declaration identifier, a `const`, or a quantifier variable is `AEG-4011`, because a policy in which `action` means something other than the action under evaluation is unreadable by the auditor who has to accept it.
 
@@ -306,7 +316,9 @@ export obligation attach_ai_disclosure {
 }
 ```
 
-An obligation MUST declare at least one `on <effect>` block and exactly one `on_failure` (`AEG-3050`). The trigger effect is `permit` or `deny`. A block MAY carry a `when` guard, which is an ordinary Bool expression over the request and MUST NOT mention the decision; the trigger already carries that information.
+An obligation MUST declare at least one `on <effect>` block and exactly one `on_failure` (`AEG-3050`). The trigger effect is `permit` or `deny`. A block MAY carry a `when` guard.
+
+**The guard is constrained.** It is a Bool expression over the request roots and `const` declarations only. It MUST NOT reference `decision`, which does not exist in expression position; it MUST NOT reference an obligation, an advice, or another obligation's discharge state; and it MUST NOT reference a rule, a rule's firing, or a policy's outcome. Violations are `AEG-4010` for an unknown name and `AEG-4130` for a construct that would require the evaluator to observe its own decision process. The trigger already carries the decision; a guard that could also inspect rules would make obligations order-dependent on rule evaluation, and I2 does not survive that.
 
 The earlier form `when decision == permit and <condition>` is deleted. It placed `decision` in an expression position, which the keyword admission rule forbids, and it referenced a name that no scope bound. The `on <effect> [when <guard>]` form expresses exactly the same thing with the trigger and the guard separated, which is also how the audit report reads it: "on permit, where the channel is external, disclose ...".
 
@@ -392,15 +404,46 @@ Absence is `Optional[T]` and MUST be discharged explicitly before the value is u
 is_expr = expr "is" ( "none" | "some" ident )
 ```
 
-`x is none` yields Bool. `x is some v` yields Bool and binds `v : T` in the branch where the test holds, narrowing `Optional[T]` to `T` there and nowhere else.
+`x is none` yields Bool. `x is some v` yields Bool and binds `v : T`, narrowing `Optional[T]` to `T` inside the scope defined below and nowhere else.
+
+**Binding scope - positive positions only, decided syntactically.** The rule is deliberately narrow, because a scoping rule that requires reasoning about which branch "holds" is a rule that authors and auditors will get wrong.
+
+| Position of `E is some v` | `v` is in scope in | Why |
+|---|---|---|
+| left operand of `and` | the right operand | the right operand is evaluated only where the left held |
+| antecedent of `implies` | the consequent | the consequent is asserted only where the antecedent held |
+| either operand of `or` | nowhere | either operand may be the one that held |
+| either operand of `xor` | nowhere | as `or`, and the exclusivity makes it worse |
+| operand of `not` | nowhere | the binding exists precisely where the negation does not |
+| right operand of `and`, consequent of `implies` | nowhere | nothing to the right of it remains in the expression |
+| anywhere else | nowhere | including a sibling rule, another rule's condition, and any `reason` string |
+
+Two positions admit a binding. Every other position does not, with no exceptions and no dataflow analysis required: the checker decides scope from the shape of the syntax tree alone.
+
+Referencing `v` outside that scope is `AEG-4012`, whose help names the two legal positions. A binding that shadows a keyword, a prelude name, or an enclosing binding is `AEG-4013`.
 
 ```aegis
-deny resource.reviewer is none
-  reason "An unassigned reviewer cannot approve anything."
-
+// Legal: left operand of `and`, so r is in scope on the right.
 deny resource.reviewer is some r and r.role != "finance.approver"
   reason "The assigned reviewer does not hold the approver role."
+
+// Legal: antecedent of `implies`, so m is in scope in the consequent.
+require resource.reviewer is some m implies m.mfa == required
+  otherwise deny
+  reason "An assigned reviewer must hold MFA."
+
+// AEG-4012: `or` binds nothing, because either side may be the side that held.
+deny resource.reviewer is some r or r.role == "x"
+
+// AEG-4012: the binding does not survive `not`.
+deny not (resource.reviewer is some r) and r.role == "x"
+
+// Legal: absence needs no binding.
+deny resource.reviewer is none
+  reason "An unassigned reviewer cannot approve anything."
 ```
+
+This is standard occurrence typing with the hard cases removed rather than solved. The removal is the point: what remains is decidable by inspection, which is what an auditor reading the policy has to do too.
 
 This is the headline safety feature of the type system and until this amendment it had no syntax at all. The predicates `is_some(o)` and `is_none(o)` in `std.core` remain available as ordinary Bool-valued calls; they do not narrow, which is why the `is` form exists.
 

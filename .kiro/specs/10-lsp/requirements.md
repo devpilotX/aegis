@@ -37,6 +37,10 @@ Provide an editor experience good enough that a compliance-literate author can w
 
 4.1. WHEN a document is formatted THEN the result SHALL be canonical and formatting SHALL be idempotent.
 4.2. WHEN a formatted document is parsed THEN the AST SHALL be unchanged.
+4.3. WHEN a value is written as two or more adjacent string literals THEN the formatter SHALL place each literal on its own line, left-aligned to the column of the first literal, and SHALL NEVER join them onto one line.
+4.4. WHEN adjacent string literals are separated by a comment THEN the formatter SHALL preserve the comment on its own line between them, so that the concatenation remains visible.
+
+Criteria 4.3 and 4.4 exist because concatenation is silent by design: `"a" "b"` is one value with no operator between the parts. Silent joining is acceptable semantics only if the formatter makes it visible, and the failure mode it guards against is real - a commented-out line sitting between two literals joins its neighbours, and an author who cannot see the vertical alignment will not notice.
 
 ### 5. Robustness
 
