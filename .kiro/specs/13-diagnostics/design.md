@@ -16,9 +16,11 @@ The component is delivered in two parts across two phases, and the split is a ha
 
 **Positions are derived, never stored.** The renderer takes raw source bytes and a line index and computes the 1-based line, the scalar-value column, and the excerpt on demand. A tab is one column and prints as one space, which keeps carets aligned without needing to know the reader's tab width.
 
-**The sink sorts before emitting.** Ascending primary-span start, ties broken by numeric code. Discovery order is an implementation detail of whichever component ran; output order is part of the conformance surface, so it must be a function of content alone (I2).
+**The sink preserves emission order and never sorts.** Emission order is source order, because the frontend is a single forward pass, so a sort could only ever change the output when something upstream is already wrong - and it would hide exactly that. Order also carries stage information across a multi-stage build: lexical findings before syntactic before semantic is how an author reads a failure, whereas sorting by position interleaves the three and buries the one that caused the others. A test asserts that re-sorting the sink's output would change it, so the no-sort guarantee is load-bearing rather than incidental (I2).
 
-**Two caps, two layers.** 200 per file in the sink, 2,000 per build in the driver. The second exists because the first is not sufficient for a multi-file bundle.
+**Two caps, two layers.** 200 per file in the sink, 2,000 per build in the driver. The second exists because the first is not sufficient for a multi-file bundle. The sink owns its cap: it emits `AEG-1006` once and signals stop, and no caller is expected to count.
+
+**Severity is `error` or `warning`; fatality is a separate boolean.** A fatal is an error that stops the pipeline, not a third severity, and `--strict` escalates severity without touching fatality.
 
 ## The catalogue is data, not prose
 
@@ -40,7 +42,7 @@ Under I8 a decision that cannot be explained is a bug, and under the product's o
 |---|---|
 | Unit | Every constructor, every severity, every rendering branch, every cap boundary |
 | Golden | Every catalogue entry, rendered uncoloured, byte-exact |
-| Property | Rendering is deterministic and total for any span within any source; sink order depends only on content |
+| Property | Rendering is deterministic and total for any span within any source; the sink preserves emission order and a re-sort would change it |
 | Fuzz | Renderer against arbitrary source bytes and arbitrary spans, including spans at and beyond end of file |
 | Conformance | Every catalogue entry has an `invalid/` case asserting the exact code |
 
