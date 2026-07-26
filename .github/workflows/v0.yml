@@ -37,8 +37,32 @@ jobs:
         with:
           node-version: '20'
 
+      - name: environment
+        run: |
+          {
+            echo '### v0 environment'
+            echo '```'
+            echo "node    $(node --version)"
+            echo "pnpm    $(pnpm --version)"
+            echo "cwd     $(pwd)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The install output is mirrored into the step summary because job logs
+      # are not readable without a token, and a failure nobody can read costs
+      # more than the six lines that make it readable.
       - name: install
-        run: pnpm install --frozen-lockfile
+        run: |
+          set -o pipefail
+          if ! pnpm install --frozen-lockfile 2>&1 | tee /tmp/install.log; then
+            {
+              echo '### pnpm install failed'
+              echo '```'
+              tail -80 /tmp/install.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
       - name: typecheck
         run: pnpm typecheck
