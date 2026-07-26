@@ -7,7 +7,7 @@
 | Tool | Version | Purpose |
 |---|---|---|
 | Git | any recent | Version control |
-| Node.js | 20+ | v0 prototype runtime |
+| Node.js | 22.13+ | v0 prototype runtime; pnpm 11 requires it |
 | TypeScript | 5+ | v0 prototype language |
 | Go | 1.22+ | v1 production language |
 | `make` | any | Task runner |
