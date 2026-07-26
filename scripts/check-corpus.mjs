@@ -396,26 +396,48 @@ function commitType(subject) {
   return m ? (m[1] ?? null) : null;
 }
 
+/**
+ * Read git trailers from the **final block** of the message, which is where git
+ * puts them and the only place they are trailers.
+ *
+ * Matching the first `Spec:` anywhere in the body is wrong, and wrong in a way
+ * that bites exactly when a commit explains the trailer convention in its own
+ * prose - which is how this bug was found, by the check rejecting the commit
+ * that introduced it.
+ */
+function trailers(body) {
+  const blocks = body.trim().split(/\r?\n\s*\r?\n/);
+  const last = (blocks[blocks.length - 1] ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const map = new Map();
+  if (last.length === 0) return map;
+  if (!last.every((l) => /^[A-Z][A-Za-z-]*:\s*\S/.test(l))) return map;
+  for (const line of last) {
+    const m = line.match(/^([A-Z][A-Za-z-]*):\s*(.+)$/);
+    if (m) map.set(m[1], (m[2] ?? "").trim());
+  }
+  return map;
+}
+
 function checkHeadTrailers(ctx) {
   const { fail, note, headSha, headBody, specTasks, implementationExists } = ctx;
   const subject = headBody.split("\n")[0] ?? "";
   const where = `commit ${headSha} (HEAD)`;
-  const task = headBody.match(/^Task:\s*(.+)$/m);
-  const spec = headBody.match(/^Spec:\s*(.+)$/m);
+  const found = trailers(headBody);
+  const taskValue = found.get("Task");
+  const specValue = found.get("Spec");
 
-  if (!task) {
+  if (taskValue === undefined) {
     fail(where, null,
-      "commit message has no `Task:` trailer; every commit must name the task it completes\n" +
+      "commit message has no `Task:` trailer in its final block; every commit must name the task it completes\n" +
       "      use `Spec: <id>` + `Task: <n.n>`, or `Spec: none` + `Task: infra` for toolchain work");
     return;
   }
-  if (!spec) {
+  if (specValue === undefined) {
     fail(where, null, "commit message has a `Task:` trailer but no `Spec:` trailer");
     return;
   }
 
-  const id = task[1].trim();
-  const specValue = spec[1].trim();
+  const id = taskValue;
   const type = commitType(subject);
 
   if (id === "infra") {
@@ -498,14 +520,13 @@ function checkTaskTrailers(fail, note) {
     const body = chunk.trim();
     if (!body) continue;
     const sha = body.split("\n")[0].trim();
-    const task = body.match(/^Task:\s*(.+)$/m);
-    const spec = body.match(/^Spec:\s*(.+)$/m);
-    if (!task || !spec) continue;
-
-    const id = task[1].trim();
+    const found = trailers(body);
+    const id = found.get("Task");
+    const specValue = found.get("Spec");
+    if (id === undefined || specValue === undefined) continue;
     if (!/^\d+(\.\d+)*$/.test(id)) continue;
 
-    const named = spec[1].split(",").map((s) => s.trim()).filter((s) => specTasks.has(s));
+    const named = specValue.split(",").map((s) => s.trim()).filter((s) => specTasks.has(s));
     if (named.length === 0) continue;
 
     examined += 1;
