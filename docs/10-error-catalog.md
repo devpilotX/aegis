@@ -155,6 +155,7 @@ Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` secti
 | 3023 | a three-letter uppercase name is reserved for a currency code |
 | 3024 | schema name must be one of the nine request roots |
 | 3025 | import alias collides with a local declaration identifier |
+| 3026 | schema for this root is already declared by an imported package |
 | 3030 | policy does not declare a combining algorithm |
 | 3031 | policy does not declare `applies_to` |
 | 3032 | policy declares no rules |
@@ -170,7 +171,20 @@ Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` secti
 
 `AEG-3070` is the generic syntax error and is owned by the parser. Its summary MUST name both the expected construct and what was found; "parse error" and "unexpected token" are forbidden. Before this amendment the parser had no code to emit at all, which meant no parser diagnostic could ship. Its recovery behaviour uses the normative synchronisation token set in `docs/03` section 0.8.
 
-`AEG-3022` is scoped to the local compilation unit. Two packages may each declare the same identifier; a package namespaces its declarations. `AEG-3025` covers the one cross-boundary case that is genuinely ambiguous, an import alias that collides with a local name.
+### AEG-3070 shapes with required help text
+
+Some syntax errors have a predictable cause, and a generic message wastes the one chance to explain it.
+
+| Shape found | Required help text |
+|---|---|
+| `<number> % <number>` | ``%`` forms a percent literal; AEGIS has no modulo operator |
+| `<number> <ident>` where the ident is a duration unit with a space | remove the space: a duration is one token, e.g. `5m`, not `5 m` |
+| `a < b < c` | comparison is non-associative; write `a < b and b < c` (see `AEG-4120`) |
+| `quant <ident> in` with no `(` | quantifier bodies are parenthesised: `count(r in c : p)` |
+| `decision` outside `expect decision stable` | `decision` is legal only in a test expectation; obligations attach with `on permit` or `on deny` |
+| `;` | AEGIS has no statement terminator; delete it (see `AEG-1005`) |
+
+`AEG-3022` is scoped to the local compilation unit. Two packages may each declare the same identifier; a package namespaces its declarations. `AEG-3025` covers the one cross-boundary case that is genuinely ambiguous, an import alias that collides with a local name. `AEG-3026` covers the other, a schema for a root an import already declared - schemas do not merge, because a root whose type depends on the import set breaks I2.
 
 ## Type and semantic (AEG-4xxx)
 
@@ -178,6 +192,8 @@ Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` secti
 |---|---|
 | 4010 | attribute is not declared in any schema (did you mean ...) |
 | 4011 | declaration shadows a predeclared identifier |
+| 4012 | Optional binding is not in scope here |
+| 4013 | Optional binding shadows a keyword, a prelude name, or an enclosing binding |
 | 4020 | test `given` value does not match the schema type |
 | 4101 | currency mismatch in comparison |
 | 4102 | cannot compare values of different enum types |
@@ -194,6 +210,8 @@ Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` secti
 The summary for `AEG-4101` is frozen as exactly `currency mismatch in comparison`. It was previously written three different ways across three documents.
 
 `AEG-4140` and `AEG-4141` are check-time codes because currency validity and duration-call range are check-time facts. `AEG-4140` validates against the ISO 4217 table in `std.core`, which is versioned data with an explicit revision identifier, exactly like a clause library. `AEG-4141` MUST carry the same `= note:` text as `AEG-1019`, per the shared-note rule above: `30001d` and `duration(30001, d)` are one author mistake reported by two layers.
+
+`AEG-4012`'s help MUST name both legal binding positions - the right operand of `and`, and the consequent of `implies` - because the author's next question is always "then where can I use it?". The scope rule is a truth table in `docs/02` section 5.5, decided from syntax alone.
 
 `AEG-4170` bounds the value of a string after adjacent literals concatenate. The lexical line limit `AEG-1011` bounds the physical line; this bounds the joined result, which is the first point at which the size of the value exists.
 

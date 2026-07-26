@@ -6,6 +6,8 @@
 
 `v0/src/diag/` in Phases 1-5, `internal/diag/` from Phase 6. `diag` may be imported by anything in the pipeline and imports nothing from it except `token`, which is what lets the lexer report before a parser exists.
 
+The component is delivered in two parts across two phases, and the split is a hard boundary recorded in `tasks.md`: the value type, the sink interface, and the code registry land in Phase 1 because the lexer cannot emit a diagnostic without them; the renderer lands in Phase 3. In Phase 1 a diagnostic is a structured value that is collected and counted, never a rendered string.
+
 ## Approach
 
 **The type makes an incomplete diagnostic unrepresentable.** `note` and `help` are required constructor arguments, not optional fields. This is deliberate: a required field cannot be forgotten under deadline pressure, and every reviewed corpus of compiler diagnostics degrades at exactly the point where the fix line became optional.
