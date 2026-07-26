@@ -24,6 +24,8 @@ currency   = /[A-Z]{3}/                   (* lexed as TypeIdent; disambiguated b
 
 ASCII only. Non-ASCII is `AEG-1004`. Longer than 128 bytes is `AEG-1012`.
 
+Every `TypeIdent` matching `^[A-Z]{3}$` is reserved as a currency code and may not name a type: `AEG-3023`. The reservation does not consult the currency table, so legality never depends on a data-file revision.
+
 ### 0.3 Numeric and duration terminals
 
 ```
@@ -53,7 +55,7 @@ string  = /"([^"\\\n\r]|\\["\\nt])*"/
 
 Four escapes only: `\"` `\\` `\n` `\t`. Any other escape is `AEG-1040`. A newline before the closing quote is `AEG-1041`. End of file before the closing quote is `AEG-1042`. There is no interpolation and no multi-line form.
 
-A **quoted name** is lexically a `string`. The 256-character limit (`AEG-1013`) and the `[A-Za-z0-9_./:-]` character set (`AEG-3080`) are enforced by the parser, which is the first component that knows the string sits in a quoted-name position.
+A **quoted name** is lexically a `string`. The 256-character limit (`AEG-3083`) and the `[A-Za-z0-9_./:-]` character set (`AEG-3080`) are enforced by the parser, which is the first component that knows the string sits in a quoted-name position. Adjacent-literal concatenation does not apply to a quoted name; see `string_lit` in section 1.
 
 ### 0.5 Boolean terminal
 
@@ -80,7 +82,18 @@ Trivia produces no syntactic token. It is retained as leading trivia on the foll
 
 That is the complete set. `;` is not in the language. Any other character outside a literal and outside trivia is `AEG-1005`.
 
-### 0.8 A note on quoted terminals below
+### 0.8 Parser synchronisation tokens (normative)
+
+On `AEG-3070` the parser discards tokens until it reaches one of these, then resumes. The set is normative so that recovery behaviour, and therefore the number and order of reported diagnostics, is identical across implementations - diagnostic output is part of the conformance surface.
+
+```
+policy  rule  capability  principal  obligation  advice  schema  enum
+const   test  suite       import     export      }
+```
+
+Owned by spec `02-parser`. Specified here so that Phase 2 does not have to invent it, and not implemented in Phase 1.
+
+### 0.9 A note on quoted terminals below
 
 Some terminals written in quotes in the productions below are **keywords** and lex as such. Others are **contextual field labels** and lex as `ident`, matched by text against the declaration being parsed: `tool`, `criticality`, `reversible`, `data_classes`, `description`, `role`, `scope`, `mfa`, `jurisdiction`, `retention`, `action`. The admission rule that decides which is which is `docs/02` section 1.5.1.
 
@@ -128,21 +141,24 @@ comb_alg      = "deny_overrides" | "permit_overrides" | "first_applicable"
 applies       = "applies_to" expr ;
 cites         = "cites" expr ;
 default_cl    = "default" effect ;
-violation     = "on" "violation" "{" { action } "}" ;
+violation     = "on" "violation" "{" { violation_action } "}" ;
+violation_action = "halt" | action_call ;
+action_call   = path [ "(" [ arg_list ] ")" ] ;
 
 rule          = "rule" ident "{" rule_body [ reason ] "}" ;
 rule_body     = deny_form | require_form | allow_form ;
 deny_form     = "deny" expr [ "unless" expr ] ;
 require_form  = "require" expr "otherwise" effect ;
 allow_form    = "allow" expr [ "when" expr ] ;
-reason        = "reason" string ;
+reason        = "reason" string_lit ;
 effect        = "permit" | "deny" | "escalate" "to" ident
               | "redact" "(" expr ")" | "throttle" "(" arg_list ")" | "halt" ;
 
-obligation    = "obligation" ident "{" "when" expr "action" action
+obligation    = "obligation" ident "{" on_effect_block { on_effect_block }
                 "on_failure" effect { cites } "}" ;
-advice        = "advice" ident "{" "when" expr "action" action "}" ;
-action        = path [ "(" [ arg_list ] ")" ] ;
+on_effect_block = "on" trigger [ "when" expr ] "{" { action_call } "}" ;
+trigger       = "permit" | "deny" ;
+advice        = "advice" ident "{" "when" expr "action" action_call "}" ;
 arg_list      = arg { "," arg } ;
 arg           = [ ident ":" ] expr ;
 
@@ -151,8 +167,8 @@ suite_decl    = "suite" string "{" { test_decl } "}" ;
 given         = "given" "{" { assign } "}" ;
 assign        = path "=" expr ;
 expect        = "expect" expect_body ;
-expect_body   = effect | "rule" ident "fired" | "reason" "contains" string
-              | "obligation" action | "decision" "stable" ;
+expect_body   = effect | "rule" ident "fired" | "reason" "contains" string_lit
+              | "obligation" action_call | "decision" "stable" ;
 
 (* expressions, lowest precedence first *)
 expr          = implies_expr ;
@@ -176,12 +192,13 @@ primary       = percent_lit | literal | path | quantifier | set_lit
               | "(" expr ")" | if_expr ;
 percent_lit   = ( int | decimal ) "%" ;
 if_expr       = "if" expr "then" expr "else" expr ;
-quantifier    = quant ident "in" expr ":" expr ;
+quantifier    = quant "(" ident "in" expr ":" expr ")" ;           (* delimited *)
 quant         = "forall" | "exists" | "count" | "any" | "all" | "none" ;
 path          = ident { "." ident } ;
 
-literal       = int | decimal | duration | string | bool ;
-set_lit       = "{" [ expr { "," expr } ] "}" ;
+literal       = int | decimal | duration | string_lit | bool ;
+string_lit    = string { string } ;    (* adjacent literals concatenate *)
+set_lit        = "{" [ expr { "," expr } ] "}" ;
 ```
 
 ## Notes
@@ -191,21 +208,16 @@ set_lit       = "{" [ expr { "," expr } ] "}" ;
 - **`between` is gone**, reserved-forbidden. As a binary `rel_op` it parsed `x between (a and b)`, and `and` accepts only Bool, so every use was either a type error or a misparse. It is sugar for two comparisons.
 - **`is` replaces it at the same precedence level** and carries Optional discharge, which previously had no syntax at all. See `docs/02` section 5.5.
 - **Unary minus exists.** Negative money must be expressible; refunds and chargebacks are core cases.
-- **`action = path [...]`**, not `ident [...]`, because the standard library's obligation actions are dotted: `audit.emit(...)`.
+- **Quantifier bodies are parenthesised.** `count(r in c : p)`. The delimiter removes the greediness that made the intended parse of `count … >= 2` underivable.
+- **`violation_action`, not `action`.** The nonterminal was renamed so it can never be confused with the `action` request root, and it admits `halt`, which is a keyword and not a `path`. `action_call` is the plain dotted call form used by obligations, advice, and expectations.
+- **Obligations attach to an effect**, `on permit [when guard] { … }`, not to a condition on a decision value. The `when decision == permit` form is deleted; see `docs/02` section 3.8.
+- **`string_lit` concatenates adjacent literals** at parse time, so long prose fits inside the 4,096-byte line limit. Quoted names, the `specification` version, and `test`/`suite` names deliberately keep the atomic `string` terminal.
 - **`type_expr` uses `TypeIdent`**, and `Record` has a real production. `Enum[E]` uses square brackets; angle brackets do not exist in the language.
 - Comparison, relational, and temporal levels are deliberately **non-associative**. `a < b < c` MUST be a diagnostic, not a reinterpretation.
 - The grammar deliberately contains no type rules and no governance semantics. Those live in the checker (`docs/04`, `docs/05`).
 - Every production above maps one-to-one onto a parse function in the parser. A parser change without a corresponding grammar change is a specification violation (I10).
 - The grammar MUST be machine-verified for ambiguity before v1.0.
 
-## Open defects - adjudication required before Phase 2
+## Open defects
 
-These were found in the P0 audit, are **not** closed by the current amendment, and MUST be decided before the parser is written. They are recorded here rather than left implicit.
-
-**OPEN-1 - quantifier body greediness.** `quantifier = quant ident "in" expr ":" expr` lets the body swallow everything to its right, so `count r in c : r.role == "x" >= 2` parses the body as `r.role == "x" >= 2`, a non-associative comparison chain (`AEG-4120`). The intended `(count …) >= 2` is not derivable. Either the body needs a delimiter, or `count` needs a different shape from the Bool-valued quantifiers.
-
-**OPEN-2 - effects inside `on violation`.** `violation = "on" "violation" "{" { action } "}"` admits only actions, but the canonical example uses `halt`, which is an `effect` keyword and not a `path`. Either the violation block admits `effect` as well as `action`, or `halt` gains an action spelling.
-
-**OPEN-3 - what an obligation's `when` clause may name.** The canonical example writes `when decision == permit`, but `decision` is not one of the nine request roots and no scope is specified in which it is bound. Either obligations evaluate in an extended scope that binds the pending decision, or the clause needs a different spelling.
-
-**OPEN-4 - schema name to request root binding.** `docs/02` section 3.5 requires every attribute path to be declared in some schema but never says how a schema's name relates to a request root. `schema request { reviewers: ... }` and a use of `resource.reviewers` cannot both be right.
+None. The four defects recorded in the first P0 amendment - greedy quantifier bodies, `halt` inside `on violation`, `decision` in an obligation `when` clause, and unbound schema names - were all adjudicated and are closed by the productions above and by `docs/02` sections 3.5, 3.8, and 5.2. Any future defect is recorded here before the parser is asked to accommodate it.

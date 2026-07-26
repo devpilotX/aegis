@@ -6,6 +6,7 @@ Every diagnostic has a permanent code. Codes are never reused, never renumbered,
 
 | Range | Category |
 |---|---|
+| `AEG-0000`-`0999` | Toolchain and driver |
 | `AEG-1000`-`1999` | Lexical and lexical limits |
 | `AEG-2000`-`2999` | Warnings and advisories |
 | `AEG-3000`-`3999` | Structural, declaration, and syntax errors |
@@ -13,7 +14,17 @@ Every diagnostic has a permanent code. Codes are never reused, never renumbered,
 | `AEG-5000`-`5999` | Runtime request errors |
 | `AEG-6000`-`6999` | Bytecode and bundle loading |
 
-**One defect, one code, one layer.** A diagnostic lives in the range of the layer that can actually detect it. Anything a one-token-lookahead scanner cannot see is not a `1xxx` code. Two codes retain numbers that predate this rule - `AEG-1013` is emitted by the parser and `AEG-1030` by the lexer on behalf of every layer - because a published code is never renumbered.
+The `0xxx` range exists because the driver is a real layer that the original catalogue had no home for: it owns whole-build concerns that no single file's lexer, parser, or checker can see.
+
+**One defect, one code, one layer.** A diagnostic lives in the range of the layer that can actually detect it. Anything a one-token-lookahead scanner cannot see is not a `1xxx` code, and where that rule collided with the convenience of keeping an existing number, the rule won: nothing has shipped, so no code is load-bearing yet.
+
+**Where one author mistake maps to two codes across two layers, both entries MUST carry an identical `= note:` line.** The codes differ because the detecting layer differs; the explanation the author reads must not. This applies today to the `AEG-1019` and `AEG-4141` pair, both of which say the same thing about the permitted duration range, and it applies to any future pair by the same rule.
+
+## Toolchain and driver (AEG-0xxx)
+
+| Code | Message | Notes |
+|---|---|---|
+| 0001 | build diagnostic limit reached, stopping | **fatal for the build**, at 2,000 diagnostics; the per-file cap is `AEG-1006` at 200 |
 
 ## Rendering standard - frozen
 
@@ -55,20 +66,41 @@ Severity is one of `error`, `warning`, `advisory`, `note`. A diagnostic without 
 | 1003 | confusable character in string literal or quoted name | never in an identifier; identifiers are ASCII-only |
 | 1004 | non-ASCII identifier not permitted | |
 | 1005 | unexpected character | also covers illegal underscore placement in a numeric literal |
-| 1006 | too many lexical errors, stopping | **fatal**, at 200 diagnostics per compilation unit |
+| 1006 | too many lexical errors, stopping | **fatal for this file**, at 200 diagnostics; the build cap is `AEG-0001` |
 | 1010 | source file exceeds 4 MiB | **fatal** |
-| 1011 | line exceeds 4,096 bytes | measured in bytes |
+| 1011 | line exceeds 4,096 bytes | measured in bytes; bounds a physical line, not a string value |
 | 1012 | identifier exceeds 128 bytes | `ident` and `TypeIdent` alike |
-| 1013 | quoted name exceeds 256 characters | emitted by the parser; see `AEG-3080` for the character set |
 | 1014 | numeric literal exceeds 38 significant digits | significance defined in `docs/02` section 1.2 |
-| 1019 | duration outside the range 1 ms to 100 y | evaluated on the canonical millisecond value |
+| 1019 | duration outside the range 1 ms to 100 y | evaluated on the canonical millisecond value; shares its `= note:` with `AEG-4141` |
 | 1030 | reserved keyword is forbidden in AEGIS | message MUST name the invariant or scope rule that forbids it |
 | 1040 | unknown escape sequence | only `\"` `\\` `\n` `\t` exist |
-| 1041 | unterminated string literal at end of line | strings are single-line |
+| 1041 | unterminated string literal at end of line | strings are single-line; adjacent literals concatenate instead |
 | 1042 | unterminated string literal at end of file | |
 | 1055 | malformed duration literal | unknown unit, or a letter or digit immediately after the unit |
 | 1056 | duration magnitude must be an integer | `1.5h` |
 | 1057 | exponent notation is not supported | `1e10` |
+
+### AEG-1030 messages where absence is likely to confuse
+
+A bare "reserved keyword" message is unhelpful when the author's intent has a legal spelling. These words get a tailored `= help:` line. Any future reservation whose absence could confuse gets the same treatment.
+
+| Word | Required help text |
+|---|---|
+| `set` | ``set`` is reserved for a future named-set declaration; set literals are written with braces, e.g. `{ pii, financial }` |
+| `between` | ``between`` is reserved; write two comparisons joined with `and`, e.g. `x >= lo and x <= hi` |
+| `for` `at` `ago` | reserved for future temporal syntax; express freshness with `within`, e.g. `human.approved_at within 5m` |
+| `always` `eventually` | reserved for future temporal logic; no equivalent exists in AEGIS 1.0 |
+| `type` | reserved for a future type alias; write the type in the `schema` field directly |
+| `where` | reserved; a rule's condition is written directly after `deny`, `allow`, or `require` |
+| `target` | reserved; a policy's target is written with `applies_to` |
+| `oblige` | reserved; write an `obligation` declaration |
+| `fixture` | reserved for future test fixtures; use a `given` block in each `test` |
+| `loop` `while` `recurse` | forbidden by I1 totality; AEGIS has no iteration other than bounded quantification |
+| `mut` `ref` `ptr` | forbidden; AEGIS has no mutable state and no references |
+| `macro` `template` `extends` `abstract` | forbidden; AEGIS has no user-defined abstraction |
+| `async` `await` `yield` `spawn` | forbidden by I3 purity; evaluation is synchronous and performs no I/O |
+| `import_dynamic` | forbidden; imports are static so that a bundle's contents are knowable before it runs |
+| `unsafe` `native` | forbidden; there is no escape hatch from the evaluator |
 
 ### Lexical diagnostic precedence - normative
 
@@ -105,6 +137,10 @@ Without a stated order, two conforming implementations would report different co
 
 Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` section 11).
 
+`AEG-2090` requires a doc comment on **every `export`ed declaration and every `policy`**, and on nothing else. Rules, tests, suites, and non-exported declarations are exempt: the audit report renders exported declarations and policies, so those are the ones whose prose an auditor will read, and demanding a doc comment on every rule would train authors to write filler.
+
+`AEG-2091` fires where a doc comment does not immediately precede a declaration. The lexer only marks trivia as `doc`; the parser decides whether it landed anywhere useful.
+
 ## Structural, declaration, and syntax (AEG-3xxx)
 
 | Code | Message |
@@ -116,19 +152,25 @@ Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` secti
 | 3020 | required capability field missing |
 | 3021 | duplicate tool name |
 | 3022 | duplicate declaration identifier |
+| 3023 | a three-letter uppercase name is reserved for a currency code |
+| 3024 | schema name must be one of the nine request roots |
+| 3025 | import alias collides with a local declaration identifier |
 | 3030 | policy does not declare a combining algorithm |
 | 3031 | policy does not declare `applies_to` |
 | 3032 | policy declares no rules |
 | 3040 | duplicate rule identifier in policy |
 | 3041 | denying or escalating rule requires a `reason` |
-| 3050 | obligation missing `when`, `action`, or `on_failure` |
+| 3050 | obligation missing an `on <effect>` block or `on_failure` |
 | 3060 | release build blocked: a policy test is failing |
 | 3070 | expected X, found Y |
 | 3080 | illegal character in quoted name |
 | 3081 | quantifier nesting exceeds depth 3 |
 | 3082 | import graph exceeds depth 32 |
+| 3083 | quoted name exceeds 256 characters |
 
-`AEG-3070` is the generic syntax error and is owned by the parser. Its summary MUST name both the expected construct and what was found; "parse error" and "unexpected token" are forbidden. Before this amendment the parser had no code to emit at all, which meant no parser diagnostic could ship.
+`AEG-3070` is the generic syntax error and is owned by the parser. Its summary MUST name both the expected construct and what was found; "parse error" and "unexpected token" are forbidden. Before this amendment the parser had no code to emit at all, which meant no parser diagnostic could ship. Its recovery behaviour uses the normative synchronisation token set in `docs/03` section 0.8.
+
+`AEG-3022` is scoped to the local compilation unit. Two packages may each declare the same identifier; a package namespaces its declarations. `AEG-3025` covers the one cross-boundary case that is genuinely ambiguous, an import alias that collides with a local name.
 
 ## Type and semantic (AEG-4xxx)
 
@@ -147,10 +189,13 @@ Under `--strict` every `2xxx` advisory is escalated to an error (`docs/02` secti
 | 4140 | unknown currency code |
 | 4141 | duration outside the permitted range |
 | 4160 | collection exceeds 4,096 elements |
+| 4170 | concatenated string value exceeds 64 KiB |
 
 The summary for `AEG-4101` is frozen as exactly `currency mismatch in comparison`. It was previously written three different ways across three documents.
 
-`AEG-4140` and `AEG-4141` are check-time codes because currency validity and duration-call range are check-time facts. `AEG-4140` validates against the ISO 4217 table in `std.core`, which is versioned data with an explicit revision identifier, exactly like a clause library.
+`AEG-4140` and `AEG-4141` are check-time codes because currency validity and duration-call range are check-time facts. `AEG-4140` validates against the ISO 4217 table in `std.core`, which is versioned data with an explicit revision identifier, exactly like a clause library. `AEG-4141` MUST carry the same `= note:` text as `AEG-1019`, per the shared-note rule above: `30001d` and `duration(30001, d)` are one author mistake reported by two layers.
+
+`AEG-4170` bounds the value of a string after adjacent literals concatenate. The lexical line limit `AEG-1011` bounds the physical line; this bounds the joined result, which is the first point at which the size of the value exists.
 
 ## Runtime (AEG-5xxx)
 
@@ -176,8 +221,11 @@ These numbers are burned. They MUST NOT be reused for any future defect, and an 
 
 | Code | Was | Disposition |
 |---|---|---|
-| 1015 | string literal exceeds 64 KiB | **retired.** Strings are single-line and `AEG-1011` bounds the line. One limit per axis. |
+| 1013 | quoted name exceeds 256 characters or contains illegal characters | **split and relocated.** Length is `AEG-3083`, character set is `AEG-3080`. Only the parser knows a string is a quoted name, and P-C outranks the convenience of keeping the number: nothing has shipped, so nothing depends on it. |
+| 1015 | string literal exceeds 64 KiB | **retired as a lexical code.** The equivalent semantic limit on a concatenated string value is `AEG-4170`. |
 | 1016 | collection exceeds 4,096 elements | **relocated** to `AEG-4160`; only the checker knows a collection's declared size. |
 | 1017 | quantifier nesting exceeds depth 3 | **relocated** to `AEG-3081`; only the parser can count nesting. |
 | 1018 | import graph exceeds depth 32 | **relocated** to `AEG-3082`; only the loader resolves the graph. |
 | 1050 | unknown currency code | **relocated** to `AEG-4140`; the lexer cannot tell `EUR` from `Set`. |
+
+Code numbers become immutable at first public release. Until then, a number that sits in the wrong range is a defect to fix, not a legacy to honour.
