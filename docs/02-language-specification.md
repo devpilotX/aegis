@@ -598,6 +598,8 @@ Both artifacts MUST derive from the same canonical IR - I5.
 
 **Bytecode `.aegisc`:** magic `0x41 0x45 0x47 0x53` (`AEGS`), major and minor version, canonical constant pool, register-based instructions, SHA-256 integrity hash, optional detached Ed25519 signature. Loader MUST validate every jump target, register index, and constant index before execution. Bad magic is `AEG-6001`, unknown major version is `AEG-6002`, hash mismatch is `AEG-6003`.
 
+**Signed bundle `.aegisb`:** a bundle carries compiled units, schemas, pinned clause versions, and test results. Signature verification failure is `AEG-6010` and a reference to an unknown signing key is `AEG-6011`. Both MUST fail closed: an unverifiable bundle is not loaded and the enforcement point denies - I7. Neither may be downgraded to a warning by configuration, because a bundle whose provenance cannot be established is indistinguishable from one an attacker supplied.
+
 **Audit report:** Markdown, HTML, or PDF. Plain language, no code. Every rule rendered with its doc comment, its reason, and its clause citations. Fail-open configuration and every suppression MUST be highlighted. Byte-stable given a fixed generation timestamp.
 
 ---
@@ -625,3 +627,5 @@ Three modes. Earlier drafts referred to "strict mode" and "release build" withou
 | Release | `aegis build --release` | Everything strict does, and additionally fails if any in-language `test` fails (`AEG-3060`). |
 
 `--release` implies `--strict`. A bundle produced by `--release` is the only artifact permitted to carry a signature, because a signed bundle asserts that its own tests passed at the moment it was built.
+
+Strict mode adds one requirement that default mode does not check at all: a doc comment is required on every `export`ed declaration and on every `policy` (`AEG-2090`). Those are the constructs the audit report renders, so those are the ones whose prose an auditor will read. Rules, tests, suites, and non-exported declarations are exempt, because requiring a comment on every rule trains authors to write filler.

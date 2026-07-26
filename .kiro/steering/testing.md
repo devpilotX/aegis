@@ -18,6 +18,10 @@ A governance language that is merely mostly correct is worthless, because its ou
 | 6. Conformance | The published suite passes, 1,200+ cases |
 | 7. Determinism | Byte-identical output across 6 targets x 10,000 runs |
 
+## Layer 0 - corpus consistency, already enforced
+
+`node scripts/check-corpus.mjs`, gated by `.github/workflows/corpus.yml` on every push and pull request. Seven checks: keyword arithmetic and steering drift, grammar terminal classification, forward and reverse catalogue closure, retired codes anywhere, retired constructs in AEGIS code, and commit task-id trailers. It runs before any compiler exists because the defect it catches - a document contradicting the specification - is the one that has actually occurred.
+
 ## Coverage floors - CI-enforced
 
 | Package group | Line | Branch |

@@ -1,0 +1,35 @@
+name: corpus
+
+# The only gate that exists yet, because no compiler exists yet. There is no
+# build, no test, and no lint step here on purpose: adding placeholder jobs that
+# always pass teaches everyone to ignore the status badge.
+#
+# What this enforces is specification consistency, which is the thing that was
+# actually broken during Phase 0 - an always-loaded steering file asserting a
+# keyword set the specification had retired.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check 5 reads commit trailers, so it needs real history rather than
+          # a depth-1 checkout. It degrades to a skip without one, and a check
+          # that silently skips in CI is not a check.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: corpus consistency checks
+        run: node scripts/check-corpus.mjs
