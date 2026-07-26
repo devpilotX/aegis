@@ -22,18 +22,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Installed before setup-node so the pnpm cache is available to it. The
+      # Installed before setup-node because the install step needs it. The
       # version comes from the pinned `packageManager` field rather than being
       # repeated here, so there is one place to change it.
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: v0/package.json
 
+      # No dependency cache. setup-node's pnpm cache resolves the store from the
+      # repository root, where there is no pnpm project - `defaults.run` applies
+      # to `run:` steps, not to actions - and it failed there. The install is
+      # four dev dependencies, so the cache bought less than the failure cost.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
-          cache-dependency-path: v0/pnpm-lock.yaml
 
       - name: install
         run: pnpm install --frozen-lockfile
