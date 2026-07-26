@@ -18,8 +18,10 @@ Two things this component deliberately does **not** do, both settled by the P0 a
 1.2. WHEN a keyword is encountered THEN the lexer SHALL emit the keyword kind, not an identifier kind.
 1.3. WHEN two token forms could match THEN the lexer SHALL apply maximal munch.
 1.4. WHEN the source ends THEN the lexer SHALL emit exactly one EOF token with a zero-width span at the end offset.
-1.5. WHEN the source is empty THEN the lexer SHALL emit exactly one EOF token with span `[0, 0)`.
-1.6. WHEN lexing stops on a fatal error THEN the lexer SHALL still emit exactly one EOF token, zero-width, at the offset where it stopped.
+1.5. WHEN the source is empty THEN the source SHALL be valid and the lexer SHALL emit exactly one EOF token with span `[0, 0)`.
+1.6. WHEN a mid-scan fatal error occurs, meaning AEG-1006, THEN the lexer SHALL return the partial token stream ending in exactly one zero-width EOF token at the offset where scanning stopped.
+1.7. WHEN a pre-scan fatal error occurs, meaning AEG-1010, AEG-1001, AEG-1008, or AEG-1009, THEN the lexer SHALL report exactly one diagnostic and SHALL produce no token stream at all, not even EOF.
+1.8. WHEN the lexer runs THEN it SHALL execute the stages in this order and no other: size check, UTF-8 validity, BOM check, NUL check, line index, scan.
 
 ### 2. Positions
 
@@ -53,11 +55,15 @@ Two things this component deliberately does **not** do, both settled by the P0 a
 
 **User story:** As a security reviewer, I need security to behave exactly as specified, so that the artifact can be trusted.
 
-4.1. WHEN invalid UTF-8 appears THEN the lexer SHALL emit AEG-1001, SHALL NOT substitute replacement characters, and SHALL stop lexing.
-4.2. WHEN a bidirectional override character appears anywhere in the source THEN the lexer SHALL emit AEG-1002.
-4.3. WHEN a confusable character appears in a string literal THEN the lexer SHALL emit AEG-1003, and it SHALL NOT apply this check to identifiers, which are ASCII-only.
-4.4. WHEN a non-ASCII byte appears in an identifier THEN the lexer SHALL emit AEG-1004.
-4.5. WHEN the lexer receives source of any kind THEN it SHALL NOT normalise it, and spans SHALL address the raw bytes as authored.
+4.1. WHEN invalid UTF-8 appears THEN the lexer SHALL emit AEG-1001, SHALL NOT substitute replacement characters, and SHALL stop before any later stage.
+4.2. WHEN any of the seven classes in `docs/02` section 1.1 appears - a continuation byte in leader position, a truncated sequence, an overlong encoding, an encoded surrogate, a codepoint above U+10FFFF, a five- or six-byte sequence, or a leader byte in `C0 C1 F5..FF` - THEN the lexer SHALL emit AEG-1001 and SHALL report the byte offset of the first offending byte.
+4.3. WHEN a byte order mark appears at offset 0 THEN the lexer SHALL emit AEG-1008 and SHALL NOT strip it.
+4.4. WHEN a NUL byte appears at any offset, including inside a string literal, THEN the lexer SHALL emit AEG-1009.
+4.5. WHEN a bidirectional override character appears anywhere in the source THEN the lexer SHALL emit AEG-1002.
+4.6. WHEN a confusable character appears in a string literal THEN the lexer SHALL emit AEG-1003, and it SHALL NOT apply this check to identifiers, which are ASCII-only.
+4.7. WHEN a non-ASCII byte appears in an identifier THEN the lexer SHALL emit AEG-1004.
+4.8. WHEN the lexer receives source of any kind THEN it SHALL NOT normalise it, and spans SHALL address the raw bytes as authored.
+4.9. WHEN validation runs THEN it SHALL operate on bytes and SHALL NOT allocate a decoded string.
 
 ### 5. Literals
 

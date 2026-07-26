@@ -28,6 +28,14 @@ Hand-written scanner over a byte array (`Uint8Array`) with one token of lookahea
 
 **No normalisation.** The scanner sees the file's raw bytes and nothing else. UTF-8 validity is checked at the boundary before scanning begins; invalid UTF-8 is `AEG-1001` and is fatal, because advancing past it would require guessing a character boundary and repair is forbidden by `docs/02` section 1.1.
 
+**The UTF-8 validator is hand-rolled, not `TextDecoder`.** Two reasons, and both matter more than the convenience given up.
+
+First, `new TextDecoder("utf-8", { fatal: true })` reports *that* the input is invalid and never *where*. `AEG-1001` must name a byte offset, and a diagnostic that says only "this file is not UTF-8" about a four-megabyte file is not a diagnostic.
+
+Second, v1 is Go. A validator written as specified range checks is portable and produces the same offset in both implementations by construction. Delegating to a host runtime's decoder means v0 and v1 agree by coincidence - two different vendors' decoders, two different edge-case behaviours around surrogates and overlong forms - and the Phase 6 differential harness exists precisely to catch that class of coincidence rather than to rely on it.
+
+The validator is a single forward pass with explicit range checks, no allocation per byte, and no decoded string at all.
+
 **Spans are half-open 0-based raw byte offsets.** Line and column are derived on demand from a line index built during scanning: the index stores line-start offsets, and column derivation rescans that line counting Unicode scalar values. Nothing stores a position on a token, so no token can carry a stale one.
 
 **Trivia is retained, not discarded.** Whitespace, line terminators, line comments, and doc comments produce no syntactic token; each is appended to the pending leading-trivia list of the next token. Doc comments carry a `doc` flag. This is what makes the byte-exact round-trip property achievable and what lets the parser - the only component that knows what a declaration is - perform doc attachment.
