@@ -168,13 +168,27 @@ This exists for a specific regulatory reason. An Article 50 transparency notice,
 
 Concatenation applies to string literals in value positions: `reason`, `description`, expression operands, and `expect reason contains`. It does **not** apply to a quoted name (`tool`, `role`), to the `specification` version, or to a `test` or `suite` name. Those four are **identities, not prose**: each is hashed as part of policy identity or used as a uniqueness key, so each must be a single literal whose bytes are visible in one place. Joining an identity from fragments would let two declarations that look different hash the same, or the reverse.
 
-**Reserved semantics.** Section 1.5 reserves *words*. This reserves a *meaning*, which is the other way a language drifts:
+**Reserved semantics.** Section 1.5 reserves *words*. This reserves *meanings*, which is the other way a language drifts: nobody adds a keyword by accident, but everybody reaches for a familiar operator.
 
-| Token | Reserved meaning | Never |
-|---|---|---|
-| `%` | postfix percent, forming a Percent literal | modulo, remainder, or any binary use |
+| Token | Status in AEGIS | Absent meaning, and why | Diagnostic |
+|---|---|---|---|
+| `%` | postfix percent | no modulo; sign behaviour on negative operands has two defensible answers | - |
+| `!` | only as part of `!=` | negation is `not`; a lone `!` is too easy to miss in a legal artifact | AEG-1005 |
+| `&` `\|` `^` | unavailable | bitwise operations have no governance meaning | AEG-1005 |
+| `&&` `\|\|` | unavailable | use `and` and `or`; two spellings of one operator is two ways to read a rule | AEG-1005 |
+| `~` | unavailable | no bitwise negation, and no regex-match sugar; matching is `matches` | AEG-1005 |
+| `<<` `>>` | unavailable | no shifts, no stream operators | AEG-3070 |
+| `**` | unavailable | no exponentiation; it is the shortest route to unbounded magnitude (I11) | AEG-3070 |
+| `++` | unavailable | no increment; there is no mutable state to increment | AEG-3070 |
+| `?` | unavailable | no ternary; use `if C then A else B`, which reads aloud | AEG-1005 |
+| `?.` | unavailable | **Optional is discharged with `is`, never silently propagated** | AEG-1005 |
+| `=>` `->` | unavailable | no lambdas, because there are no functions | AEG-3070 |
+| `::` | unavailable | package paths use `.` | AEG-3070 |
+| `@` `#` `$` | unavailable | reserved for a future annotation syntax | AEG-1005 |
 
-There is no modulo operator in AEGIS and there will not be one. Modulo on negative operands has two defensible answers - truncated and floored - and a language whose output is used to answer regulators cannot ship an operator whose result depends on which convention the implementer happened to know. No governance policy has needed it. `85 % 2` is therefore a Percent literal followed by an integer, and the parser reports it with `AEG-3070` carrying help that says so.
+`?.` is the most consequential row. It is the first thing a TypeScript-trained contributor reaches for, it looks like a convenience, and it directly violates I7: optional chaining turns an absent value into another absent value and defers the decision, which is precisely the deferral that fail-closed forbids. An `Optional` in AEGIS is discharged where it is read, by a construct the auditor can see.
+
+There is no modulo operator in AEGIS and there will not be one. A language whose output is used to answer regulators cannot ship an operator whose result depends on which rounding convention the implementer happened to know. No governance policy has needed it. `85 % 2` is therefore a Percent literal followed by an integer, and the parser reports it with `AEG-3070` carrying help that says so.
 
 **Delimiters and operators - the complete set.**
 
@@ -404,9 +418,47 @@ Absence is `Optional[T]` and MUST be discharged explicitly before the value is u
 is_expr = expr "is" ( "none" | "some" ident )
 ```
 
-`x is none` yields Bool. `x is some v` yields Bool and binds `v : T`, narrowing `Optional[T]` to `T` inside the scope defined below and nowhere else.
+`x is none` yields Bool. `x is some v` yields Bool and binds `v : T`, narrowing `Optional[T]` to `T` inside the scope defined below and nowhere else. The rule is deliberately narrow, because a scoping rule that requires reasoning about which branch "holds" is a rule that authors and auditors will get wrong. It is defined by recursion on the expression, not by operand position: a positional rule cannot see through a chain of `and`.
 
-**Binding scope - positive positions only, decided syntactically.** The rule is deliberately narrow, because a scoping rule that requires reasoning about which branch "holds" is a rule that authors and auditors will get wrong.
+**Binding introduction - normative.** Define `binds(E)`, the set of names an expression introduces in positive position, recursively:
+
+```
+binds(E is some v)   = { v }
+binds(A and B)       = binds(A) union binds(B)
+binds(A implies B)   = { }        -- nothing escapes an implication
+binds(A or B)        = { }
+binds(A xor B)       = { }
+binds(not A)         = { }
+binds(anything else) = { }
+```
+
+**Scope rule - two clauses, and no others.**
+
+- In `A and B`, every name in `binds(A)` is in scope throughout `B`.
+- In `A implies B`, every name in `binds(A)` is in scope throughout `B`.
+
+Nowhere else. Not in a sibling rule, not in another rule's condition, not in a `reason` string, and not to the left of the test that introduced it.
+
+Four consequences, all normative.
+
+**1. Chains of any length work, because `binds` distributes over `and`.** This is the case a positional rule cannot express:
+
+```aegis
+deny resource.primary_reviewer   is some v
+ and resource.secondary_reviewer is some w
+ and v.id == w.id
+  reason "The two approvers must be different people."
+```
+
+That parses left-associatively as `((v-test and w-test) and v.id == w.id)`. The outer `and`'s left operand is itself an `and` node, not an `is some` test, so a rule phrased in terms of "the left operand is an `is some` test" would bind nothing in the third operand and reject both names. Under `binds`, `binds(v-test and w-test) = {v, w}`, and both are in scope in the third operand. The recursion is what makes the headline safety feature usable with two Optionals at once.
+
+**2. An implication is a binding barrier.** `binds(A implies B) = { }`, so `(resource.reviewer is some v implies p) and v.x` is `AEG-4012`. This is deliberate: `v` is known to exist only on the branch where the antecedent held, and an implication as a whole is true precisely when the antecedent is false. A name that may have been introduced by a condition that did not hold is not a name.
+
+**3. Two bindings with the same name anywhere in one chain is `AEG-4013`.** `binds` is a set union, so a collision is ambiguity rather than shadowing: `a is some v and b is some v and v.x` has no defensible reading, and picking one silently is exactly the class of decision this language exists to refuse.
+
+**4. `not (a is some v)` binds nothing**, even though the negation is informative - it tells you `a` is absent. Fail-closed applies to type information too: the compiler declines to carry a fact whose usefulness depends on which branch a reader is thinking about.
+
+**Position table - derived from `binds()`, non-normative where the two disagree.** It remains a correct summary of what each operator position does, and `binds` is the definition.
 
 | Position of `E is some v` | `v` is in scope in | Why |
 |---|---|---|
@@ -415,12 +467,10 @@ is_expr = expr "is" ( "none" | "some" ident )
 | either operand of `or` | nowhere | either operand may be the one that held |
 | either operand of `xor` | nowhere | as `or`, and the exclusivity makes it worse |
 | operand of `not` | nowhere | the binding exists precisely where the negation does not |
-| right operand of `and`, consequent of `implies` | nowhere | nothing to the right of it remains in the expression |
+| right operand of `and`, consequent of `implies` | nowhere further | nothing to the right of it remains in the expression |
 | anywhere else | nowhere | including a sibling rule, another rule's condition, and any `reason` string |
 
-Two positions admit a binding. Every other position does not, with no exceptions and no dataflow analysis required: the checker decides scope from the shape of the syntax tree alone.
-
-Referencing `v` outside that scope is `AEG-4012`, whose help names the two legal positions. A binding that shadows a keyword, a prelude name, or an enclosing binding is `AEG-4013`.
+Referencing a name outside its scope is `AEG-4012`, whose help names the two legal positions. A colliding or shadowing binding is `AEG-4013`.
 
 ```aegis
 // Legal: left operand of `and`, so r is in scope on the right.
@@ -432,18 +482,36 @@ require resource.reviewer is some m implies m.mfa == required
   otherwise deny
   reason "An assigned reviewer must hold MFA."
 
+// Legal: binds distributes over `and`, so both names reach the third operand.
+deny resource.primary_reviewer is some v
+ and resource.secondary_reviewer is some w
+ and v.id == w.id
+  reason "The two approvers must be different people."
+
 // AEG-4012: `or` binds nothing, because either side may be the side that held.
 deny resource.reviewer is some r or r.role == "x"
 
 // AEG-4012: the binding does not survive `not`.
 deny not (resource.reviewer is some r) and r.role == "x"
 
+// AEG-4012: an implication is a barrier; v does not escape it.
+deny (resource.reviewer is some v implies v.role == "x") and v.id != ""
+
+// AEG-4013: the same name introduced twice in one chain is ambiguity.
+deny resource.primary_reviewer is some v
+ and resource.secondary_reviewer is some v
+ and v.id == ""
+
 // Legal: absence needs no binding.
 deny resource.reviewer is none
   reason "An unassigned reviewer cannot approve anything."
 ```
 
-This is standard occurrence typing with the hard cases removed rather than solved. The removal is the point: what remains is decidable by inspection, which is what an auditor reading the policy has to do too.
+This is standard occurrence typing with the hard cases removed rather than solved. The removal is the point: what remains is decidable from the syntax tree, which is what an auditor reading the policy has to do too.
+
+This is the headline safety feature of the type system and until this amendment it had no syntax at all. The predicates `is_some(o)` and `is_none(o)` in `std.core` remain available as ordinary Bool-valued calls; they do not narrow, which is why the `is` form exists.
+
+Conformance cases for all three shapes exist now, not later: `conformance/valid/semantics/optional-binding-chain` and `conformance/invalid/semantics/optional-binding-{implication-barrier,duplicate-name}`.
 
 This is the headline safety feature of the type system and until this amendment it had no syntax at all. The predicates `is_some(o)` and `is_none(o)` in `std.core` remain available as ordinary Bool-valued calls; they do not narrow, which is why the `is` form exists.
 

@@ -80,6 +80,22 @@ Severity is one of `error`, `warning`, `advisory`, `note`. A diagnostic without 
 | 1056 | duration magnitude must be an integer | `1.5h` |
 | 1057 | exponent notation is not supported | `1e10` |
 
+### AEG-1005 characters with required help text
+
+Every character in the reserved-semantics table of `docs/02` section 1.7 has a construct an author was reaching for. Naming it is the difference between a diagnostic and an obstacle.
+
+| Found | Required help text |
+|---|---|
+| `!` alone | negation is `not`; `!` appears only in `!=` |
+| `&` `\|` `^` | AEGIS has no bitwise operators; use `and`, `or`, `xor` for Bool |
+| `&&` `\|\|` | write `and` and `or`; AEGIS has one spelling per operator |
+| `~` | AEGIS has no bitwise negation; for pattern matching use `matches` with an RE2 pattern |
+| `?` | AEGIS has no ternary operator; use `if C then A else B` |
+| `?.` | AEGIS has no optional chaining; discharge the Optional with `x is some v`, then use `v` (fail-closed, I7) |
+| `@` `#` `$` | reserved for a future annotation syntax and unavailable today |
+| `;` | AEGIS has no statement terminator; delete it |
+| `_` leading, trailing, doubled, or beside a decimal point | an underscore separates digits, e.g. `1_000.000_1` |
+
 ### AEG-1030 messages where absence is likely to confuse
 
 A bare "reserved keyword" message is unhelpful when the author's intent has a legal spelling. These words get a tailored `= help:` line. Any future reservation whose absence could confuse gets the same treatment.
@@ -183,6 +199,11 @@ Some syntax errors have a predictable cause, and a generic message wastes the on
 | `quant <ident> in` with no `(` | quantifier bodies are parenthesised: `count(r in c : p)` |
 | `decision` outside `expect decision stable` | `decision` is legal only in a test expectation; obligations attach with `on permit` or `on deny` |
 | `;` | AEGIS has no statement terminator; delete it (see `AEG-1005`) |
+| `<<` `>>` | AEGIS has no shift or stream operators |
+| `**` | AEGIS has no exponentiation; it is the shortest route to unbounded magnitude (I11) |
+| `++` | AEGIS has no increment; there is no mutable state |
+| `=>` `->` | AEGIS has no lambdas, because it has no user-defined functions |
+| `::` | package paths use `.`, e.g. `std.eu_ai_act` |
 
 `AEG-3022` is scoped to the local compilation unit. Two packages may each declare the same identifier; a package namespaces its declarations. `AEG-3025` covers the one cross-boundary case that is genuinely ambiguous, an import alias that collides with a local name. `AEG-3026` covers the other, a schema for a root an import already declared - schemas do not merge, because a root whose type depends on the import set breaks I2.
 
@@ -211,7 +232,9 @@ The summary for `AEG-4101` is frozen as exactly `currency mismatch in comparison
 
 `AEG-4140` and `AEG-4141` are check-time codes because currency validity and duration-call range are check-time facts. `AEG-4140` validates against the ISO 4217 table in `std.core`, which is versioned data with an explicit revision identifier, exactly like a clause library. `AEG-4141` MUST carry the same `= note:` text as `AEG-1019`, per the shared-note rule above: `30001d` and `duration(30001, d)` are one author mistake reported by two layers.
 
-`AEG-4012`'s help MUST name both legal binding positions - the right operand of `and`, and the consequent of `implies` - because the author's next question is always "then where can I use it?". The scope rule is a truth table in `docs/02` section 5.5, decided from syntax alone.
+`AEG-4012`'s help MUST name both legal binding positions - the right operand of `and`, and the consequent of `implies` - because the author's next question is always "then where can I use it?". The scope rule is the recursive `binds()` definition in `docs/02` section 5.5.
+
+**Why `AEG-4012` and `AEG-4013` are 4xxx and not 3xxx, recorded so it is not revisited.** The scope rule is decidable from the syntax tree, so it looks like a parser concern. It is not. Deciding whether a name is in scope requires an environment of live bindings, and building that environment *is* binding resolution, which lives in `check`. Putting these codes in the parser would force `parser` to track scopes, and `structure.md` forbids `parser` from importing `types` or `check`. The layering decides the range, not the flavour of the rule.
 
 `AEG-4170` bounds the value of a string after adjacent literals concatenate. The lexical line limit `AEG-1011` bounds the physical line; this bounds the joined result, which is the first point at which the size of the value exists.
 

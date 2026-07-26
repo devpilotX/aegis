@@ -1,0 +1,18 @@
+{
+  "decision": "deny",
+  "policy": "conformance.semantics.two_distinct_approvers",
+  "combining": "deny_overrides",
+  "decisiveRules": [
+    {
+      "id": "distinct_reviewers",
+      "reason": "The two approvers must be different people.",
+      "bindings": {
+        "resource.primary_reviewer": { "id": "u-1042", "role": "finance.approver" },
+        "resource.secondary_reviewer": { "id": "u-1042", "role": "legal.approver" }
+      }
+    }
+  ],
+  "obligations": [],
+  "advice": [],
+  "diagnostics": []
+}

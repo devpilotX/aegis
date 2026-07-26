@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "AEG-4012",
+      "line": 19,
+      "col": 10,
+      "summary": "Optional binding is not in scope here",
+      "note": "binds(A implies B) is empty, so `v` does not escape the implication",
+      "helpMustMention": ["right operand of `and`", "consequent of `implies`"]
+    }
+  ],
+  "mustNotEmit": ["AEG-4013", "AEG-4110"]
+}

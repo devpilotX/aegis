@@ -1,0 +1,25 @@
+// binds is a set union, so introducing the same name twice in one chain is
+// ambiguity rather than shadowing, and there is no defensible reading to pick.
+// docs/02 section 5.5, consequence 3.
+specification "1.0"
+package conformance.semantics
+
+schema resource {
+  primary_reviewer   : Optional[Record{ id: String, role: String }]
+  secondary_reviewer : Optional[Record{ id: String, role: String }]
+}
+
+policy duplicate_binding_name {
+  combining  deny_overrides
+  applies_to true
+
+  /// Both tests introduce `v`; which one the third operand means is undefined.
+  rule ambiguous_binding {
+    deny resource.primary_reviewer   is some v
+     and resource.secondary_reviewer is some v
+     and v.id == ""
+      reason "This rule does not compile; the binding name collides."
+  }
+
+  default deny
+}
