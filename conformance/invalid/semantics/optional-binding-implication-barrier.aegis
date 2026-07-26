@@ -1,0 +1,24 @@
+// An implication is a binding barrier: binds(A implies B) = { }.
+// `v` is known to exist only on the branch where the antecedent held, and the
+// implication as a whole is true precisely when the antecedent is false.
+// docs/02 section 5.5, consequence 2.
+specification "1.0"
+package conformance.semantics
+
+schema resource {
+  reviewer : Optional[Record{ id: String, role: String }]
+}
+
+policy implication_barrier {
+  combining  deny_overrides
+  applies_to true
+
+  /// The reference to v after the implication is out of scope.
+  rule leaks_across_implication {
+    deny (resource.reviewer is some v implies v.role == "finance.approver")
+     and v.id != ""
+      reason "This rule does not compile; the binding does not escape the implication."
+  }
+
+  default deny
+}

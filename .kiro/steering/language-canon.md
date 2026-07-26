@@ -138,7 +138,7 @@ Comparison is deliberately non-associative. `a < b < c` is error `AEG-4120`, not
 ## Syntax that is easy to get wrong
 
 - **Quantifier bodies are parenthesised:** `count(r in resource.reviewers : r.role == "legal.approver") >= 2`. Without the parentheses the body swallows the comparison.
-- **Optional discharge is `is`:** `x is none`, or `x is some v` which binds and narrows `v`. The binding is in scope in **exactly two places**: the right operand of `and`, and the consequent of `implies`. Nowhere else, ever - not under `or`, `xor`, or `not`. Outside those two positions it is `AEG-4012`.
+- **Optional discharge is `is`:** `x is none`, or `x is some v` which binds and narrows `v`. Scope is defined by recursion, not by position: `binds(A and B) = binds(A) ∪ binds(B)`, and everything else - `or`, `xor`, `not`, `implies` - binds nothing. A name in `binds(A)` is in scope throughout `B` in `A and B` and in `A implies B`, and nowhere else. Chains of any length therefore work; an implication is a barrier. Out of scope is `AEG-4012`, a duplicate name in one chain is `AEG-4013`.
 - **`money(...)` is a call**, not a literal. `85%` is two tokens. `30d` is one token.
 - **Adjacent string literals concatenate** at parse time, which is how long prose fits inside the 4,096-byte line limit. Not for identities: `tool`, `role`, the `specification` version, and `test` names must each be one literal.
 - **A schema's name is a request root:** `schema resource { ... }`. `schema request` is `AEG-3024`. Schemas never merge; a root already declared by an import is `AEG-3026`.

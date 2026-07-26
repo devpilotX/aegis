@@ -1,0 +1,6 @@
+{
+  "resource": {
+    "primary_reviewer": { "id": "u-1042", "role": "finance.approver" },
+    "secondary_reviewer": { "id": "u-1042", "role": "legal.approver" }
+  }
+}

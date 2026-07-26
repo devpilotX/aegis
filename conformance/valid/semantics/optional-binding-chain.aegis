@@ -1,0 +1,26 @@
+// Two Optional discharges used together in one condition.
+// binds(A and B) = binds(A) union binds(B), so both v and w reach the third
+// operand even though the outer `and`'s left operand is an `and` node and not
+// an `is some` test. docs/02 section 5.5.
+specification "1.0"
+package conformance.semantics
+
+schema resource {
+  primary_reviewer   : Optional[Record{ id: String, role: String }]
+  secondary_reviewer : Optional[Record{ id: String, role: String }]
+}
+
+policy two_distinct_approvers {
+  combining  deny_overrides
+  applies_to true
+
+  /// The same person may not occupy both approver slots.
+  rule distinct_reviewers {
+    deny resource.primary_reviewer   is some v
+     and resource.secondary_reviewer is some w
+     and v.id == w.id
+      reason "The two approvers must be different people."
+  }
+
+  default deny
+}

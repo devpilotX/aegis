@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "AEG-4013",
+      "line": 19,
+      "col": 46,
+      "summary": "Optional binding shadows a keyword, a prelude name, or an enclosing binding",
+      "note": "binds is a set union, so introducing `v` twice in one chain is ambiguity, not shadowing",
+      "secondarySpan": { "line": 18, "col": 46, "label": "first introduced here" }
+    }
+  ],
+  "mustNotEmit": ["AEG-4012"]
+}
