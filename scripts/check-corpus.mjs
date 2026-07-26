@@ -439,8 +439,14 @@ function checkHeadTrailers(ctx) {
 
   const id = taskValue;
   const type = commitType(subject);
+  const ids = id.split(",").map((s) => s.trim()).filter(Boolean);
 
-  if (id === "infra") {
+  if (ids.includes("infra")) {
+    if (ids.length !== 1) {
+      fail(where, null,
+        `\`Task: ${id}\` mixes infra with task ids; a commit is either infrastructure or task work`);
+      return;
+    }
     if (specValue !== "none") {
       fail(where, null, `\`Task: infra\` requires \`Spec: none\`, found \`Spec: ${specValue}\``);
     }
@@ -454,7 +460,8 @@ function checkHeadTrailers(ctx) {
     return;
   }
 
-  if (!/^\d+(\.\d+)*$/.test(id)) {
+  const nonNumeric = ids.filter((one) => !/^\d+(\.\d+)*$/.test(one));
+  if (nonNumeric.length > 0) {
     if (implementationExists) {
       fail(where, null,
         `\`Task: ${id}\` is neither a numeric task id nor \`infra\`, and v0/ exists\n` +
@@ -471,9 +478,12 @@ function checkHeadTrailers(ctx) {
       `\`Spec: ${specValue}\` names no known spec id; expected one of ${[...specTasks.keys()].join(", ")}`);
     return;
   }
-  if (!named.some((s) => specTasks.get(s).has(id))) {
+  // Every id in the list must exist, not merely the first: a commit closing
+  // 13.1, 13.2, and 13.3 is claiming all three.
+  const missing = ids.filter((one) => !named.some((s) => specTasks.get(s).has(one)));
+  if (missing.length > 0) {
     fail(where, null,
-      `Task: ${id} does not exist in ${named.map((c) => `.kiro/specs/${c}/tasks.md`).join(" or ")}`);
+      `Task id(s) ${missing.join(", ")} do not exist in ${named.map((c) => `.kiro/specs/${c}/tasks.md`).join(" or ")}`);
   }
 }
 
@@ -594,6 +604,102 @@ const TOOLCHAIN_SOURCES = [
   },
 ];
 
+/**
+ * Numeric limits are declared in the docs/02 table, restated in the canon's
+ * table, and hard-coded as constants in v0. Three places, and the Node floor
+ * proved that three places disagree.
+ *
+ * The docs/02 table is the source of truth. Rows are keyed by their diagnostic
+ * code rather than their label, because the two tables label the same limit
+ * differently - "Source size" against "Source file" - and a label match would
+ * fail for a cosmetic reason.
+ */
+const LIMIT_CONSTANTS = [
+  {
+    label: "MAX_SOURCE_BYTES",
+    file: "v0/src/token/admit.ts",
+    code: "1010",
+    re: /MAX_SOURCE_BYTES = (\d+) \* 1024 \* 1024/,
+    scale: 1024 * 1024,
+  },
+  {
+    label: "MAX_DIAGNOSTICS_PER_FILE",
+    file: "v0/src/diag/sink.ts",
+    code: "1006",
+    re: /MAX_DIAGNOSTICS_PER_FILE = (\d+)/,
+    scale: 1,
+  },
+];
+
+/** Rows of a limits table, keyed by every diagnostic code the row cites. */
+function limitRows(text) {
+  const rows = new Map();
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("|")) continue;
+    const cells = line.split("|").map((c) => c.trim());
+    if (cells.length < 5) continue;
+    const value = cells[2] ?? "";
+    const codes = [...(cells[3] ?? "").matchAll(/(?:AEG-)?(\d{4})/g)].map((m) => m[1]);
+    if (codes.length === 0) continue;
+    // Strip inline code spans so a character class such as [A-Za-z0-9_./:-]
+    // does not contribute digits that are not a limit.
+    const numbers = [...value.replace(/`[^`]*`/g, "").matchAll(/\d[\d,]*/g)]
+      .map((m) => Number(m[0].replace(/,/g, "")));
+    for (const code of codes) rows.set(code, { value, numbers });
+  }
+  return rows;
+}
+
+function checkNumericLimits(fail) {
+  const specTable = limitRows(
+    read(SPEC).split("### 1.2 Hard limits")[1]?.split("### 1.3")[0] ?? "",
+  );
+  const canonTable = limitRows(
+    read(CANON).split("## Hard limits")[1] ?? "",
+  );
+
+  if (specTable.size === 0 || canonTable.size === 0) {
+    fail(SPEC, null, "could not locate a hard-limits table in docs/02 or the canon");
+    return;
+  }
+
+  for (const [code, spec] of [...specTable].sort()) {
+    const canon = canonTable.get(code);
+    if (!canon) {
+      fail(CANON, null, `the canon's hard-limits table has no row for AEG-${code}`);
+      continue;
+    }
+    if (spec.numbers.length === 0 || canon.numbers.length === 0) continue;
+    if (spec.numbers.join(",") !== canon.numbers.join(",")) {
+      fail(CANON, null,
+        `limit AEG-${code} disagrees: docs/02 says "${spec.value}", the canon says "${canon.value}"`);
+    }
+  }
+
+  for (const code of canonTable.keys()) {
+    if (!specTable.has(code)) {
+      fail(SPEC, null, `the canon declares a limit for AEG-${code} that docs/02 section 1.2 does not`);
+    }
+  }
+
+  for (const constant of LIMIT_CONSTANTS) {
+    if (!existsSync(join(ROOT, constant.file))) continue; // not implemented yet
+    const m = read(constant.file).match(constant.re);
+    if (!m) {
+      fail(constant.file, null,
+        `${constant.label} not found; check 9 asserts it against the AEG-${constant.code} limit in docs/02`);
+      continue;
+    }
+    const declared = Number(m[1]) * constant.scale;
+    const spec = specTable.get(constant.code);
+    const expected = (spec?.numbers[0] ?? 0) * (/MiB/.test(spec?.value ?? "") ? 1024 * 1024 : 1);
+    if (declared !== expected) {
+      fail(constant.file, null,
+        `${constant.label} is ${declared} but docs/02 says "${spec?.value}" for AEG-${constant.code} (${expected})`);
+    }
+  }
+}
+
 function checkToolchainAgreement(fail) {
   const found = [];
   for (const source of TOOLCHAIN_SOURCES) {
@@ -660,6 +766,7 @@ const CHECKS = [
   ["commit task-id trailers", () => checkTaskTrailers(fail, note)],
   ["reverse catalogue closure", () => checkReverseClosure(fail, ctx.cat, ctx.refs)],
   ["declared toolchain versions agree", () => checkToolchainAgreement(fail)],
+  ["declared numeric limits agree", () => checkNumericLimits(fail)],
 ];
 
 console.log("AEGIS corpus checks\n");
