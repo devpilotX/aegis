@@ -40,20 +40,22 @@ Every diagnostic has a stable code `AEG-NNNN` that never changes meaning once re
 
 ### Rendering standard (rustc-style, normative)
 
+The frozen standard lives in `docs/10-error-catalog.md` and that file is the single authority; this is the same standard, restated for convenience.
+
 ```
 error[AEG-4101]: currency mismatch in comparison
   --> policies/payments.aegis:42:18
    |
 42 |   require resource.amount < money(500, USD)
-   |           ^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^ Money[USD]
+   |           ^^^^^^^^^^^^^^^   --------------- Money[USD]
    |           |
    |           Money[EUR]
    |
    = note: currency is part of the Money type (type rule 2)
-   = help: convert explicitly with convert(resource.amount, USD, rate)
+   = help: convert explicitly with convert(money(500, USD), to: EUR, rate: context.fx_eur_usd)
 ```
 
-Required parts: severity, code, one-line summary, file:line:col, source excerpt with carets, at least one `note` explaining the rule, and at least one `help` proposing a fix. A diagnostic without a `help` line is incomplete work.
+Required parts: severity, code, one-line summary, file:line:col, source excerpt with carets, at least one `note` explaining the rule, and at least one `help` proposing a fix. `= spec:` is optional. `= why:` does not exist. A secondary span is required only where a second location genuinely exists. A diagnostic without a `help` line is incomplete work.
 
 Never say "invalid", "unexpected", or "malformed" alone. Say what was found, what was expected, and what to do.
 
@@ -76,15 +78,19 @@ CI greps for that token and fails the build. A wrong legal citation in a complia
 One task, one commit. Conventional Commits format, with the spec and task in the trailer.
 
 ```
-feat(lexer): tokenize money literals with currency suffix
+feat(lexer): fuse duration literals into a single token
 
-Implements decimal-with-currency lexing per docs/02 section 3.4.
-Rejects unknown currency codes with AEG-1050.
+Implements integer-plus-unit duration lexing per docs/02 section 1.7, with
+the three side conditions from docs/03 section 0.3: a letter or digit after
+the unit is AEG-1055, a decimal magnitude is AEG-1056, and exponent
+notation is AEG-1057. Range is checked in canonical milliseconds (AEG-1019).
 
 Spec: 01-lexer
 Task: 1.7
 Invariants: I2, I11
 ```
+
+Note what this example is not. There is no money literal to tokenize: `money(...)` is a call, and currency validity is `AEG-4140` in the checker, not `AEG-1050` in the lexer. Getting that wrong in a commit message is how a retired code returns to life.
 
 Allowed types: `feat` `fix` `spec` `test` `perf` `refactor` `docs` `build` `chore`.
 

@@ -27,7 +27,6 @@ aegis/
     report/                 # IR -> compliance prose (I5 second output)
     diag/                   # diagnostics, rendering, error catalogue
     lsp/                    # language server
-  spec/                     # normative grammar and spec fragments
   conformance/
     valid/                  # must compile and evaluate as stated
     invalid/                # must fail with the exact diagnostic code
@@ -38,6 +37,10 @@ aegis/
   prompts/                  # master prompt and phase prompts
   .kiro/                    # steering, specs, agents
 ```
+
+Phases 1-5 additionally have a `v0/` TypeScript tree; its layout is in `tech.md`.
+
+There is no `spec/` directory. `docs/03-grammar.md` is the normative grammar and `docs/02-language-specification.md` is the normative specification. One artifact, one home.
 
 ## Dependency rule - dependencies flow downward only
 

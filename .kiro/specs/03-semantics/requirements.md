@@ -35,7 +35,7 @@ Desugar the three rule surface forms into one core form, then resolve every name
 3.1. WHEN an import alias is used THEN it SHALL resolve to the imported package.
 3.2. WHEN a non-exported symbol is referenced across packages THEN binding SHALL emit an error.
 3.3. WHEN imports form a cycle THEN binding SHALL emit AEG-3010 with the full cycle path.
-3.4. WHEN the import graph exceeds depth 32 THEN binding SHALL emit AEG-1018.
+3.4. WHEN the import graph exceeds depth 32 THEN binding SHALL emit AEG-3082.
 
 ### 4. Determinism
 

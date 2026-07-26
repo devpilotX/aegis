@@ -1,11 +1,21 @@
 // The smallest useful AEGIS program. Phase 1 target: three keywords, end to end.
+// DRAFT: see README.md in this directory. This does not compile yet.
 specification "1.0"
 package examples.hello
+
+export capability delete_production_data {
+  tool         "data.delete"
+  criticality  critical
+  reversible   false
+  data_classes { operational }
+}
+
+schema context { environment : String }
 
 /// Any attempt to delete production data is refused outright.
 policy no_production_deletes {
   combining  deny_overrides
-  applies_to action.capability == "data.delete"
+  applies_to action.capability == delete_production_data
 
   rule block_prod {
     deny context.environment == "production"
@@ -16,12 +26,18 @@ policy no_production_deletes {
 }
 
 test "blocks a production delete" {
-  given { action.capability = "data.delete"; context.environment = "production" }
+  given {
+    action.capability   = delete_production_data
+    context.environment = "production"
+  }
   expect deny
   expect rule block_prod fired
 }
 
 test "allows a staging delete" {
-  given { action.capability = "data.delete"; context.environment = "staging" }
+  given {
+    action.capability   = delete_production_data
+    context.environment = "staging"
+  }
   expect permit
 }

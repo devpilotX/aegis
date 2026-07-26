@@ -114,7 +114,7 @@
 518. Define a total order over every value type **[C] P6**
 519. Sort sets and record fields by canonical encoding **[C] P6**
 520. Eliminate locale-sensitive comparison and case folding **[C] P6**
-521. Normalise all strings to NFC at the boundary **[C] P6**
+521. Validate UTF-8 at the boundary and carry raw bytes unchanged thereafter; never normalise **[C] P6**
 522. Inject the clock as an explicit parameter everywhere **[C] P6**
 523. Forbid direct clock access in the evaluator by construction **[C] P6**
 524. Inject randomness as an explicit seed, or eliminate it entirely **[C] P6**

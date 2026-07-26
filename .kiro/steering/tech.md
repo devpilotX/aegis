@@ -15,6 +15,27 @@ The v0 implementation is a throwaway prototype and must be treated as one. Do no
 
 Rationale: learning Go while simultaneously designing a novel type system is the second-fastest way to fail. Separate the two problems.
 
+## The v0 layout - normative, so it is never ambiguous again
+
+Phases 1-5 live in `v0/`. TypeScript strict mode, pnpm, vitest as the only dependency.
+
+```
+v0/
+  package.json          pnpm, TypeScript 5+, vitest pinned exactly
+  tsconfig.json         strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes
+  vitest.config.ts      coverage thresholds per the table in testing.md
+  src/
+    token/              token kinds, spans, Token, keyword table
+    lexer/              source bytes -> tokens + trivia
+    diag/               diagnostic type, sink, renderer
+    ast/ parser/ desugar/ types/ check/ eval/
+  conformance-runner/   reads ../conformance
+```
+
+The same file and function limits apply as in v1: 600 lines per file, 60 per function, 5 parameters, cyclomatic complexity 15, nesting depth 4. Dependencies flow downward exactly as they will in Go, so Phase 6 is a translation rather than a redesign: `lexer` imports `token` and `diag` only.
+
+There is no `spec/` directory in either tree. `docs/03-grammar.md` is the one normative home for the grammar.
+
 ## Why Go for v1
 
 1. Single static binary with `CGO_ENABLED=0` satisfies I9 directly, with no runtime, no interpreter, and no shared libraries.

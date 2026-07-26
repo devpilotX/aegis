@@ -118,9 +118,9 @@ Tags: **[C]** Critical · **[I]** Important · **[N]** Nice. Phase markers `P0`�
 100. Strip a UTF-8 BOM correctly and reject a mid-file BOM **[C] P1**
 101. Decode UTF-8 with explicit validation and error positions **[C] P1**
 102. Reject invalid UTF-8 with a precise diagnostic **[C] P1**
-103. Apply Unicode NFC normalisation to source text **[C] P1**
-104. Explain why NFC normalisation is required for hash stability **[C] P1**
-105. Detect and reject homoglyph confusables in identifiers **[C] P1**
+103. Treat invalid UTF-8 as fatal without substituting replacement characters **[C] P1**
+104. Explain why AEGIS forbids source normalisation: NFC inside a string literal would rewrite author-visible disclosure text that is hashed as policy identity, and identifiers are ASCII-only so normalisation buys nothing where homoglyph attacks matter **[C] P1**
+105. Detect and reject homoglyph confusables in string literals and quoted names **[C] P1**
 106. Reject non-ASCII identifiers with a clear rationale message **[C] P1**
 107. Detect and reject invisible and bidirectional control characters **[C] P1**
 108. Lex line comments **[C] P1**
