@@ -72,3 +72,7 @@ export {
   lineStart,
   renderLineColumn,
 } from "./lines.js";
+
+export type { Admission, AdmissionError, Utf8Defect } from "./admit.js";
+
+export { MAX_SOURCE_BYTES, admitSource, hexDump, validateUtf8 } from "./admit.js";

@@ -9,7 +9,7 @@ This list was rewritten after the P0 audit adjudication. Three tasks that instru
 
 - [x] **1.1** Define the token kind enumeration and the Token type with span
 - [x] **1.2** Implement the line index and lazy 1-based line/column derivation over scalar values
-- [ ] **1.3** Implement UTF-8 validation at the boundary as a fatal check (AEG-1001)
+- [x] **1.3** Implement UTF-8 validation at the boundary as a fatal check (AEG-1001)
 - [ ] **1.4** Implement the core scanner loop with maximal munch, the delimiter set, and AEG-1005
 - [ ] **1.5** Implement ident and TypeIdent recognition, the 77-word keyword table, and the 29 reserved-forbidden words (AEG-1030)
 - [ ] **1.6** Implement integer and decimal literals with underscore placement rules and the 38-digit limit (AEG-1005, AEG-1014, AEG-1057)

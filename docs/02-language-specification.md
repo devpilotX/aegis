@@ -18,11 +18,15 @@ Source text MUST be valid UTF-8. Invalid UTF-8 is `AEG-1001` and is fatal (secti
 |---|---|---|
 | 1 | A continuation byte in leader position | `80`, `BF` |
 | 2 | A truncated sequence, including truncation at end of file | `E2 82` |
-| 3 | An overlong encoding: any codepoint written in more bytes than the minimum | `C0 AF` for `/` |
+| 3 | An overlong encoding: any codepoint written in more bytes than the minimum | `E0 80 AF` for `/` |
 | 4 | A surrogate codepoint `U+D800`-`U+DFFF` encoded as UTF-8 (CESU-8, WTF-8) | `ED A0 80` |
 | 5 | A codepoint above `U+10FFFF` | `F4 90 80 80` |
 | 6 | A five- or six-byte sequence | `F8 88 80 80 80` |
 | 7 | The leader bytes that can never be valid | `C0`, `C1`, `F5`-`FF` |
+
+**The classes are disjoint, and the boundary between 3, 5, and 7 is where an implementation goes wrong.** `C0` and `C1` are class 7 rather than class 3: they are structurally incapable of leading a valid sequence, so they are rejected on sight without inspecting what follows. The same holds for `F5`-`F7`, which could only lead a codepoint above the maximum, and for `FE` and `FF`, which lead nothing. Class 3 is therefore reached only by a leader that *could* have been valid - `E0` or `F0` - followed by a continuation byte too low to justify the length. Class 5 is reached only by `F4` followed by `90` or above. An implementation that reports class 3 for `C0 AF` is not wrong about the input, but it is wrong about the code, and diagnostic codes are part of the conformance surface.
+
+**Noncharacters are not rejected.** `U+FFFE` and `U+FFFF` are well-formed UTF-8 and are accepted here; they are a Unicode-semantics question, not an encoding one, and the invisible-character work in `AEG-1002`/`AEG-1003` is where they belong if anywhere.
 
 **A byte order mark at the start of the file is `AEG-1008` and is fatal.** A leading `U+FEFF` is rejected, not stripped. Stripping it would shift every byte offset by three, and a span is an offset into the raw file bytes (I2); accepting it would put the mark inside the first token's span, where no author put it. The help text is literal, because the fix is: *save the file as UTF-8 without a byte order mark*. This will be the most frequently hit diagnostic in the catalogue for contributors on editors that add a mark by default.
 
