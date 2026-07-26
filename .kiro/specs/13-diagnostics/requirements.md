@@ -12,11 +12,14 @@ This spec did not exist before the P0 audit. Phase 3 is the diagnostics phase an
 
 ### 1. The diagnostic type
 
-1.1. WHEN a diagnostic is constructed THEN it SHALL carry a code, a severity, a one-line summary, a primary span, at least one note, and at least one help.
+1.1. WHEN a diagnostic is constructed THEN it SHALL carry a code, a severity, a fatality flag, a one-line summary, a location, at least one note, and at least one help.
 1.2. WHEN a diagnostic has no actionable fix THEN construction SHALL fail at compile time, not at run time; a diagnostic without a help line is not representable.
 1.3. WHEN a second source location is relevant THEN the diagnostic MAY carry one or more secondary spans with their own labels, and WHEN no second location exists THEN it SHALL carry none.
 1.4. WHEN a diagnostic cites a specification section THEN it SHALL render as `= spec:`, which is optional.
 1.5. WHEN a diagnostic is constructed THEN `= why:` SHALL NOT exist as a field; that content belongs in `= note:`.
+1.6. WHEN a severity is expressed THEN it SHALL be `error` or `warning` and nothing else; `advisory` is a warning and `note` is a line inside a diagnostic, not a severity.
+1.7. WHEN fatality is expressed THEN it SHALL be a boolean separate from severity, because a fatal is an error that stops the pipeline rather than a third severity.
+1.8. WHEN a diagnostic has no derivable line and column, as AEG-1001 does not, THEN its location SHALL be a distinct variant of the location type rather than an absent or nullable field, so that a consumer cannot fail to handle it.
 
 ### 2. Rendering
 
@@ -29,10 +32,11 @@ This spec did not exist before the P0 audit. Phase 3 is the diagnostics phase an
 
 ### 3. The sink
 
-3.1. WHEN diagnostics are collected THEN they SHALL be emitted in ascending order of primary span start, and ties SHALL break by code, so that output order never depends on discovery order (I2).
-3.2. WHEN 200 diagnostics have been collected for one file THEN the sink SHALL emit AEG-1006 and stop accepting more for that file.
+3.1. WHEN diagnostics are collected THEN the sink SHALL preserve emission order, which is source order, and SHALL NEVER reorder them - not by code, not by severity, not by position.
+3.2. WHEN 200 diagnostics have been collected for one file THEN the sink SHALL emit AEG-1006 and signal stop, and the caller SHALL NOT be required to count.
 3.3. WHEN 2,000 diagnostics have been collected for one build THEN the driver SHALL emit AEG-0001 and stop the build.
-3.4. WHEN a duplicate diagnostic with identical code and identical primary span is added THEN the sink SHALL retain exactly one.
+3.4. WHEN a duplicate diagnostic with identical code and identical location is added THEN the sink SHALL retain exactly one.
+3.5. WHEN the cap is reached THEN AEG-1006 SHALL be emitted exactly once however many further diagnostics are offered.
 
 ### 4. Catalogue integrity
 
@@ -48,6 +52,7 @@ This spec did not exist before the P0 audit. Phase 3 is the diagnostics phase an
 5.2. WHEN `--strict` is set THEN every 2xxx advisory SHALL be escalated to an error.
 5.3. WHEN `--release` is set THEN strict behaviour SHALL apply and a failing in-language test SHALL additionally fail the build with AEG-3060.
 5.4. WHEN an advisory is explicitly suppressed THEN the suppression SHALL be recorded and SHALL appear in the audit report (AEG-2100).
+5.5. WHEN severity is escalated by `--strict` THEN fatality SHALL NOT change, because whether the pipeline can continue is a property of the defect and not of the build configuration.
 
 ## Out of scope
 

@@ -55,7 +55,13 @@ Required parts, in this order:
 
 `= spec:` is optional and may cite a specification section. `= why:` is deleted; its content belongs in `= note:`. A **secondary span** is required only where a second location genuinely exists - `AEG-4101` has one, `AEG-1001` does not.
 
-Severity is one of `error`, `warning`, `advisory`, `note`. A diagnostic without a `help` line is incomplete work. Never say "invalid", "unexpected", or "malformed" alone: say what was found, what was expected, and what to do.
+**Severity is `error` or `warning`, and that is the whole set.** Fatality is a **separate boolean**, not a third severity: a fatal is an error that stops the pipeline, and conflating the two would make "how bad is it" and "can we continue" the same question when they are not. `AEG-1011` is a non-fatal error and `AEG-1010` is a fatal one; both are errors.
+
+Earlier drafts listed four severities, `error`, `warning`, `advisory`, and `note`. That was a category error twice over. An *advisory* is a warning - the `2xxx` range is the advisory range, and `--strict` escalates the whole range to errors. A *note* was never a severity at all: `= note:` is a line **inside** a diagnostic, and listing it beside `error` invited a renderer to emit a bare note as though it were a finding.
+
+**Strict mode escalates severity and MUST NOT touch fatality.** Under `--strict` a warning becomes an error; a non-fatal error does not become fatal, because whether the pipeline can continue is a property of the defect and not of the build configuration.
+
+A diagnostic without a `help` line is incomplete work. Never say "invalid", "unexpected", or "malformed" alone: say what was found, what was expected, and what to do.
 
 ## Lexical (AEG-1xxx)
 
