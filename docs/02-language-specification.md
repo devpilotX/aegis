@@ -38,6 +38,7 @@ Bidirectional override characters anywhere in the source are `AEG-1002`. Confusa
 | Collection cardinality | 4,096 | AEG-4160 | checker |
 | Concatenated string value | 64 KiB | AEG-4170 | checker |
 
+<!-- retired-ok: AEG-1015 -->
 There is deliberately **one limit per axis, at the layer that owns the axis**. `AEG-1011` bounds a single physical line in bytes, which is a lexical fact. The size of a string *value* is a semantic fact, because adjacent string literals concatenate at parse time (section 1.7), so it is bounded separately at 64 KiB by `AEG-4170`. The old lexical code `AEG-1015` stays retired: it measured the wrong thing at the wrong layer.
 
 Only the first six rows are lexical. The rest are detected by the first component that can actually see the construct, and each code sits in that component's range.

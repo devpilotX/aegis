@@ -22,10 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # check 5 reads commit trailers, so it needs real history rather than
-          # a depth-1 checkout. It degrades to a skip without one, and a check
-          # that silently skips in CI is not a check.
-          fetch-depth: 0
+          # Only the trailer check reads history, and it needs HEAD's message
+          # plus enough ancestry to scan past numeric task ids. 50 is ample for
+          # that and stays cheap as the project grows; depth 1 would make the
+          # check degrade to a skip, and a check that silently skips in CI is
+          # not a check.
+          fetch-depth: 50
 
       - uses: actions/setup-node@v4
         with:
