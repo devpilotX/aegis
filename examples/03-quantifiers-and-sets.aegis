@@ -1,0 +1,33 @@
+// Bounded quantification is the only iteration in AEGIS. There are no loops.
+specification "1.0"
+package examples.quantifiers
+
+schema request {
+  reviewers        : Set[Record{ id: String, role: String, at: Timestamp }]
+  attachments      : Set[Record{ name: String, data_class: String }]
+}
+
+policy segregation_of_duties {
+  combining  deny_overrides
+  applies_to action.capability == "contract.sign"
+
+  /// At least two distinct approvers, and never the requester.
+  rule two_approvers {
+    require count r in resource.reviewers : r.role == "legal.approver" >= 2
+    otherwise deny
+      reason "Contract signature requires two distinct legal approvers."
+  }
+
+  rule not_self_approved {
+    deny exists r in resource.reviewers : r.id == subject.id
+      reason "An actor may not approve its own request."
+  }
+
+  /// No attachment may carry special-category data.
+  rule no_special_category {
+    deny exists a in resource.attachments : a.data_class == "special_category"
+      reason "Special-category personal data may not be attached to an automated signature request."
+  }
+
+  default deny
+}

@@ -1,0 +1,40 @@
+// TEMPLATE: EU AI Act Article 50 - Transparency
+// Purpose: Persons interacting with an AI system must be informed that they are doing so.
+// Adapt the constants and the applies_to target. Do not remove the citation.
+specification "1.0"
+package templates.eu_ai_act_art50_transparency
+import std.eu_ai_act as eu
+import std.nist_ai_rmf as nist
+import std.iso42001 as iso42001
+import std.gdpr as gdpr
+import std.soc2 as soc2
+
+const approval_freshness = 5m
+const max_eval_age       = 30d
+const min_score          = 0.90
+
+/// Persons interacting with an AI system must be informed that they are doing so.
+policy transparency_disclosure {
+  combining  deny_overrides
+  applies_to true                    // NARROW THIS before deployment
+  cites eu.article(50)
+
+  rule transparency_disclosure {
+    deny context.channel == "external"
+    unless obligation disclose_ai_interaction satisfied
+      reason "Persons interacting with an AI system must be informed that they are doing so."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("governance-oncall")
+  }
+}
+
+test "template compiles and denies by default" {
+  given { }
+  expect deny
+}

@@ -1,0 +1,26 @@
+// Currency is part of the type. Cross-currency comparison is a compile error.
+specification "1.0"
+package examples.money
+
+const eur_daily_cap = money(50_000, EUR)
+
+policy spend_caps {
+  combining  deny_overrides
+  applies_to action.capability == "payments.transfer"
+
+  rule daily_cap {
+    deny resource.amount > eur_daily_cap
+      reason "Transfer exceeds the daily agent spend cap."
+  }
+
+  /// Conversion is explicit and the rate is recorded in the evidence record.
+  rule usd_cap {
+    deny convert(resource.amount_usd, to: EUR, rate: fx.eur_usd) > eur_daily_cap
+      reason "Converted transfer amount exceeds the daily agent spend cap."
+  }
+
+  // The following would be AEG-4101 and is deliberately left commented:
+  // deny resource.amount > money(10_000, USD)
+
+  default permit
+}

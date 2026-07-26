@@ -1,0 +1,40 @@
+// TEMPLATE: EU AI Act Article 14 - Human Oversight
+// Purpose: High-risk actions require fresh, meaningful human approval by a designated overseer.
+// Adapt the constants and the applies_to target. Do not remove the citation.
+specification "1.0"
+package templates.eu_ai_act_art14_human_oversight
+import std.eu_ai_act as eu
+import std.nist_ai_rmf as nist
+import std.iso42001 as iso42001
+import std.gdpr as gdpr
+import std.soc2 as soc2
+
+const approval_freshness = 5m
+const max_eval_age       = 30d
+const min_score          = 0.90
+
+/// High-risk actions require fresh, meaningful human approval by a designated overseer.
+policy human_oversight_gate {
+  combining  deny_overrides
+  applies_to true                    // NARROW THIS before deployment
+  cites eu.article(14)
+
+  rule human_oversight_gate {
+    deny action.capability in high_risk_capabilities
+    unless human.approved_by(designated_overseer) within approval_freshness
+      reason "High-risk actions require fresh, meaningful human approval by a designated overseer."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("governance-oncall")
+  }
+}
+
+test "template compiles and denies by default" {
+  given { }
+  expect deny
+}

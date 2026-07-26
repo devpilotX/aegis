@@ -1,0 +1,39 @@
+// TEMPLATE: NIST AI RMF - MEASURE, Evaluation Freshness
+// Purpose: Deployment is gated on a recent, passing evaluation of the relevant safety suite.
+// Adapt the constants and the applies_to target. Do not remove the citation.
+specification "1.0"
+package templates.nist_measure_eval_freshness
+import std.eu_ai_act as eu
+import std.nist_ai_rmf as nist
+import std.iso42001 as iso42001
+import std.gdpr as gdpr
+import std.soc2 as soc2
+
+const approval_freshness = 5m
+const max_eval_age       = 30d
+const min_score          = 0.90
+
+/// Deployment is gated on a recent, passing evaluation of the relevant safety suite.
+policy eval_freshness {
+  combining  deny_overrides
+  applies_to true                    // NARROW THIS before deployment
+  cites nist.subcategory("MEASURE-2.3")
+
+  rule eval_freshness {
+    deny eval(target_suite).age > max_eval_age or eval(target_suite).score < min_score
+      reason "Deployment is gated on a recent, passing evaluation of the relevant safety suite."
+  }
+
+  default deny
+
+  on violation {
+    halt
+    audit.emit(severity: high, evidence: full_trace)
+    notify("governance-oncall")
+  }
+}
+
+test "template compiles and denies by default" {
+  given { }
+  expect deny
+}

@@ -1,0 +1,40 @@
+// Obligations are binding. Advice is not. Article 50 disclosure as an obligation.
+specification "1.0"
+package examples.disclosure
+import std.eu_ai_act as eu
+
+obligation disclose_ai_interaction {
+  when       action.capability == "comms.send" and context.channel == "external"
+  action     disclose(text: eu.transparency_notice())
+  on_failure deny
+  cites      eu.article(50)
+}
+
+advice suggest_review {
+  when   eval("tone_safety").score < 0.90
+  action notify("content-review")
+}
+
+policy external_comms {
+  combining  deny_overrides
+  applies_to action.capability == "comms.send"
+  cites eu.article(50)
+
+  rule eval_freshness {
+    deny eval("tone_safety").age > 30d
+      reason "Safety evaluation is stale; a passing score from last month is not assurance."
+  }
+
+  rule redact_pii {
+    allow context.channel == "external"
+    when  not exists f in resource.fields : f.data_class == "pii"
+  }
+
+  default deny
+}
+
+test "stale eval blocks external send" {
+  given { action.capability = "comms.send"; context.channel = "external" }
+  expect deny
+  expect rule eval_freshness fired
+}
